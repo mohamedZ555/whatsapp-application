@@ -69,7 +69,7 @@ export default function CampaignNewPage() {
               onChange={(e) => setForm((s) => ({ ...s, templateId: e.target.value }))}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
             >
-              <option value="">No template</option>
+              <option value="">{t('noTemplate')}</option>
               {templates.map((tpl) => (
                 <option key={tpl.id} value={tpl.id}>{tpl.templateName}</option>
               ))}

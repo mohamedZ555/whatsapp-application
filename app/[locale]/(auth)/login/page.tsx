@@ -5,11 +5,11 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from '@/i18n/navigation';
 import { Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
+import LocaleSwitcher from '@/components/layout/locale-switcher';
 
 export default function LoginPage() {
   const t = useTranslations('auth');
   const tc = useTranslations('common');
-  const te = useTranslations('errors');
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -40,6 +40,12 @@ export default function LoginPage() {
 
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
+      <div className="mb-4 flex justify-end">
+        <LocaleSwitcher
+          showLabel
+          className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 hover:bg-gray-100"
+        />
+      </div>
       {/* Logo */}
       <div className="text-center mb-8">
         <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center mx-auto mb-3">

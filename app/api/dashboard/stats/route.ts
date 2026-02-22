@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { getActorFromSession, isSuperAdmin } from '@/lib/rbac';
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const vendorId = (session.user as any).vendorId;
-  if (!vendorId) return NextResponse.json({ error: 'No vendor' }, { status: 403 });
+  const actor = getActorFromSession(session);
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const vendorIdParam = new URL(req.url).searchParams.get('vendorId') ?? undefined;
+  const vendorId = isSuperAdmin(actor) ? vendorIdParam : actor.vendorId ?? undefined;
+  const where = vendorId ? { vendorId } : {};
 
   const [
     totalContacts,
@@ -18,19 +22,21 @@ export async function GET(req: NextRequest) {
     recentMessages,
     deliveryStats,
   ] = await Promise.all([
-    prisma.contact.count({ where: { vendorId, status: 1 } }),
-    prisma.whatsappMessageLog.count({ where: { vendorId } }),
-    prisma.campaign.count({ where: { vendorId, status: { in: [1, 2] } } }),
-    prisma.subscription.findFirst({ where: { vendorId, status: 'active' }, orderBy: { createdAt: 'desc' } }),
+    prisma.contact.count({ where: { ...where, status: 1 } }),
+    prisma.whatsappMessageLog.count({ where }),
+    prisma.campaign.count({ where: { ...where, status: { in: [1, 2] } } }),
+    vendorId
+      ? prisma.subscription.findFirst({ where: { vendorId, status: 'active' }, orderBy: { createdAt: 'desc' } })
+      : Promise.resolve(null),
     prisma.whatsappMessageLog.findMany({
-      where: { vendorId },
+      where,
       orderBy: { createdAt: 'desc' },
       take: 10,
       include: { contact: { select: { firstName: true, lastName: true, waId: true } } },
     }),
     prisma.whatsappMessageLog.groupBy({
       by: ['status'],
-      where: { vendorId },
+      where,
       _count: true,
     }),
   ]);
@@ -39,7 +45,7 @@ export async function GET(req: NextRequest) {
     totalContacts,
     totalMessages,
     activeCampaigns,
-    planId: subscription?.planId ?? 'free',
+    planId: subscription?.planId ?? (vendorId ? 'free' : 'all'),
     recentMessages,
     deliveryStats,
   });

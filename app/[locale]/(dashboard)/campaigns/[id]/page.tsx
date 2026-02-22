@@ -48,12 +48,12 @@ export default async function CampaignDetailsPage({ params }: { params: Promise<
       </div>
 
       <div className="bg-white rounded-2xl border border-emerald-100 overflow-hidden">
-        <div className="px-5 py-3 border-b border-emerald-100 font-semibold text-gray-900">Recent Activity</div>
+        <div className="px-5 py-3 border-b border-emerald-100 font-semibold text-gray-900">{t('recentActivity')}</div>
         <table className="w-full text-sm">
           <thead className="bg-emerald-50/60 border-b border-emerald-100">
             <tr>
               <th className="text-start px-4 py-3 font-medium text-gray-600">{tc('status')}</th>
-              <th className="text-start px-4 py-3 font-medium text-gray-600">Message</th>
+              <th className="text-start px-4 py-3 font-medium text-gray-600">{t('message')}</th>
               <th className="text-start px-4 py-3 font-medium text-gray-600">{tc('createdAt')}</th>
             </tr>
           </thead>

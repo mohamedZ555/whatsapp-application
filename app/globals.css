@@ -17,3 +17,20 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), "Segoe UI", sans-serif;
 }
+
+button {
+  cursor: pointer;
+}
+
+button:disabled,
+button[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.admin-console-bg {
+  background-color: #f3f3f3;
+  background-image:
+    radial-gradient(circle at 24px 24px, rgba(173, 173, 173, 0.18) 2px, transparent 0),
+    radial-gradient(circle at 12px 12px, rgba(188, 188, 188, 0.16) 1.5px, transparent 0);
+  background-size: 48px 48px, 48px 48px;
+}

@@ -12,7 +12,7 @@ declare module 'next-auth' {
   }
 }
 
-export type { AppLocale as Locale } from '@/i18n/routing';
+export type Locale = 'ar' | 'en';
 
 export interface ApiResponse<T = unknown> {
   success: boolean;

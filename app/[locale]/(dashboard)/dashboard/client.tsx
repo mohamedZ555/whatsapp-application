@@ -68,7 +68,7 @@ export default function DashboardClient({ locale }: { locale: string }) {
         </div>
         <div className="divide-y divide-gray-50">
           {stats?.recentMessages?.length === 0 && (
-            <div className="px-6 py-8 text-center text-gray-400 text-sm">No messages yet.</div>
+            <div className="px-6 py-8 text-center text-gray-400 text-sm">{t('noMessagesYet')}</div>
           )}
           {stats?.recentMessages?.map((msg: any) => (
             <div key={msg.id} className="px-6 py-3 flex items-center gap-3">

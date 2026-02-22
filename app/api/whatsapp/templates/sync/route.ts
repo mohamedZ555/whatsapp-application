@@ -3,11 +3,16 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { getTemplates } from '@/lib/whatsapp/api';
+import { getActorFromSession, isSuperAdmin } from '@/lib/rbac';
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const vendorId = (session.user as any).vendorId;
+  const actor = getActorFromSession(session);
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const body = await req.json().catch(() => ({}));
+  const vendorId = isSuperAdmin(actor) ? (body.vendorId ?? actor.vendorId) : actor.vendorId;
+  if (!vendorId) return NextResponse.json({ error: 'Vendor is required.' }, { status: 400 });
 
   const settings = await prisma.vendorSetting.findMany({
     where: { vendorId, settingKey: { in: ['whatsapp_access_token', 'whatsapp_business_account_id'] } },

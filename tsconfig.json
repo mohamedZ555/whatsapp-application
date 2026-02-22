@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-  ],
+, "i18n/request.js", "i18n/navigation.js", "i18n/routing.js", "i18n.js"  ],
   "exclude": ["node_modules"]
 }

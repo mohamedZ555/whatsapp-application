@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
+import LocaleSwitcher from '@/components/layout/locale-switcher';
 
 export default function RegisterPage() {
   const t = useTranslations('auth');
@@ -59,6 +60,12 @@ export default function RegisterPage() {
 
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
+      <div className="mb-4 flex justify-end">
+        <LocaleSwitcher
+          showLabel
+          className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 hover:bg-gray-100"
+        />
+      </div>
       <div className="text-center mb-8">
         <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center mx-auto mb-3">
           <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">

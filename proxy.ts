@@ -20,6 +20,18 @@ export async function proxy(request: NextRequest) {
   const pathWithoutLocale = pathname.replace(/^\/(en|ar)(?=\/|$)/, '') || '/';
   const withLocale = (path: string) => `/${locale}${path}`;
 
+  const isDashboardRoute =
+    pathWithoutLocale.startsWith('/dashboard') ||
+    pathWithoutLocale.match(
+      /^\/(contacts|chat|campaigns|templates|bot-replies|message-log|users|subscription|settings)/,
+    );
+  const isAdminRoute = pathWithoutLocale.startsWith('/admin');
+  const isAuthPage = pathWithoutLocale === '/login' || pathWithoutLocale === '/register';
+
+  if (!isDashboardRoute && !isAdminRoute && !isAuthPage) {
+    return intlResponse ?? NextResponse.next();
+  }
+
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
@@ -29,16 +41,11 @@ export async function proxy(request: NextRequest) {
   const roleId = token?.roleId as number | undefined;
   const permissions = token?.permissions as string[] | undefined;
 
-  if (
-    pathWithoutLocale.startsWith('/dashboard') ||
-    pathWithoutLocale.match(
-      /^\/(contacts|chat|campaigns|templates|bot-replies|message-log|users|subscription|settings)/,
-    )
-  ) {
+  if (isDashboardRoute) {
     if (!isAuthenticated) {
       return NextResponse.redirect(new URL(withLocale('/login'), request.url));
     }
-    if (roleId !== USER_ROLES.VENDOR && roleId !== USER_ROLES.VENDOR_USER) {
+    if (roleId !== USER_ROLES.SUPER_ADMIN && roleId !== USER_ROLES.VENDOR && roleId !== USER_ROLES.VENDOR_USER) {
       return NextResponse.redirect(new URL(withLocale('/login'), request.url));
     }
     if (!canAccessVendorPath(pathWithoutLocale, roleId, permissions)) {
@@ -46,13 +53,13 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (pathWithoutLocale.startsWith('/admin')) {
+  if (isAdminRoute) {
     if (!isAuthenticated || roleId !== USER_ROLES.SUPER_ADMIN) {
       return NextResponse.redirect(new URL(withLocale('/login'), request.url));
     }
   }
 
-  if (isAuthenticated && (pathWithoutLocale === '/login' || pathWithoutLocale === '/register')) {
+  if (isAuthenticated && isAuthPage) {
     if (roleId === USER_ROLES.SUPER_ADMIN) {
       return NextResponse.redirect(new URL(withLocale('/admin'), request.url));
     }

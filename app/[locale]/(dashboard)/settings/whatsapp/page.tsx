@@ -6,7 +6,11 @@ import { useTranslations } from 'next-intl';
 export default function SettingsWhatsappPage() {
   const t = useTranslations('settings');
   const tc = useTranslations('common');
-  const [form, setForm] = useState({ whatsapp_phone_number_id: '', whatsapp_verify_token: '', whatsapp_access_token: '' });
+  const [form, setForm] = useState({
+    current_phone_number_id: '',
+    whatsapp_business_account_id: '',
+    whatsapp_access_token: '',
+  });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -14,8 +18,8 @@ export default function SettingsWhatsappPage() {
       .then((r) => r.json())
       .then((data) =>
         setForm({
-          whatsapp_phone_number_id: data.whatsapp_phone_number_id ?? '',
-          whatsapp_verify_token: data.whatsapp_verify_token ?? '',
+          current_phone_number_id: data.current_phone_number_id ?? data.whatsapp_phone_number_id ?? '',
+          whatsapp_business_account_id: data.whatsapp_business_account_id ?? '',
           whatsapp_access_token: data.whatsapp_access_token ?? '',
         })
       )
@@ -40,21 +44,21 @@ export default function SettingsWhatsappPage() {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">{t('phoneNumber')}</label>
           <input
-            value={form.whatsapp_phone_number_id}
-            onChange={(e) => setForm((s) => ({ ...s, whatsapp_phone_number_id: e.target.value }))}
+            value={form.current_phone_number_id}
+            onChange={(e) => setForm((s) => ({ ...s, current_phone_number_id: e.target.value }))}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Verify Token</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{t('businessAccountId')}</label>
           <input
-            value={form.whatsapp_verify_token}
-            onChange={(e) => setForm((s) => ({ ...s, whatsapp_verify_token: e.target.value }))}
+            value={form.whatsapp_business_account_id}
+            onChange={(e) => setForm((s) => ({ ...s, whatsapp_business_account_id: e.target.value }))}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Access Token</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{t('accessToken')}</label>
           <input
             value={form.whatsapp_access_token}
             onChange={(e) => setForm((s) => ({ ...s, whatsapp_access_token: e.target.value }))}

@@ -3,11 +3,16 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkLimit } from '@/lib/permissions';
+import { getActorFromSession, isSuperAdmin } from '@/lib/rbac';
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const vendorId = (session.user as any).vendorId;
+  const actor = getActorFromSession(session);
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const vendorIdParam = new URL(req.url).searchParams.get('vendorId') ?? undefined;
+  const vendorId = isSuperAdmin(actor) ? (vendorIdParam ?? actor.vendorId ?? undefined) : actor.vendorId ?? undefined;
+  if (!vendorId) return NextResponse.json([]);
 
   const botReplies = await prisma.botReply.findMany({
     where: { vendorId, status: { not: 5 } },
@@ -20,12 +25,16 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const vendorId = (session.user as any).vendorId;
+  const actor = getActorFromSession(session);
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const body = await req.json();
+  const vendorId = isSuperAdmin(actor) ? (body.vendorId ?? actor.vendorId) : actor.vendorId;
+  if (!vendorId) return NextResponse.json({ error: 'Vendor is required.' }, { status: 400 });
 
   const canAdd = await checkLimit(vendorId, 'botReplies');
   if (!canAdd) return NextResponse.json({ error: 'Bot reply limit reached. Please upgrade.' }, { status: 403 });
 
-  const body = await req.json();
   const { replyName, triggerType, triggerSubject, replyMessage, replyType, botFlowId, data } = body;
 
   if (!replyName || !triggerType) return NextResponse.json({ error: 'Required fields missing.' }, { status: 400 });

@@ -4,6 +4,8 @@ import { use, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { cn, getInitials } from '@/lib/utils';
+import { useSession } from 'next-auth/react';
+import { USER_ROLES } from '@/lib/constants';
 
 export default function ChatPage({ params }: { params: Promise<{ contactId?: string[] }> }) {
   const { contactId } = use(params);
@@ -11,10 +13,15 @@ export default function ChatPage({ params }: { params: Promise<{ contactId?: str
   const t = useTranslations('chat');
   const tc = useTranslations('common');
   const router = useRouter();
+  const { data: session } = useSession();
+  const roleId = (session?.user as any)?.roleId as number | undefined;
+  const canAssign = roleId === USER_ROLES.SUPER_ADMIN || roleId === USER_ROLES.VENDOR;
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [activeContact, setActiveContact] = useState<any>(null);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [assigning, setAssigning] = useState(false);
   const [text, setText] = useState('');
   const [search, setSearch] = useState('');
   const [sending, setSending] = useState(false);
@@ -40,6 +47,15 @@ export default function ChatPage({ params }: { params: Promise<{ contactId?: str
       .catch(() => {});
   }, [selectedContactId]);
 
+  useEffect(() => {
+    if (!activeContact || !canAssign) return;
+    const vendorQuery = activeContact.vendorId ? `?vendorId=${encodeURIComponent(activeContact.vendorId)}` : '';
+    fetch(`/api/chat/team${vendorQuery}`)
+      .then((r) => r.json())
+      .then((data) => setTeamMembers(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [activeContact?.id, canAssign]);
+
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -60,6 +76,23 @@ export default function ChatPage({ params }: { params: Promise<{ contactId?: str
       setText('');
       setMessages((prev) => [...prev, data.data]);
     }
+  }
+
+  async function handleAssign(assignedUserId: string) {
+    if (!activeContact || assigning) return;
+    setAssigning(true);
+    await fetch('/api/chat/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contactId: activeContact.id, assignedUserId: assignedUserId || null }),
+    });
+    setAssigning(false);
+    const refreshed = await fetch(`/api/chat/messages/${activeContact.id}`).then((r) => r.json());
+    setActiveContact(refreshed.contact ?? null);
+    fetch(`/api/chat/contacts?search=${encodeURIComponent(search)}`)
+      .then((r) => r.json())
+      .then(setContacts)
+      .catch(() => {});
   }
 
   const contactName = (c: any) =>
@@ -132,6 +165,23 @@ export default function ChatPage({ params }: { params: Promise<{ contactId?: str
                     <p className="font-medium text-gray-900">{contactName(activeContact)}</p>
                     <p className="text-xs text-gray-500">{activeContact.waId}</p>
                   </div>
+                  {canAssign && (
+                    <div className="ms-auto">
+                      <select
+                        value={activeContact.assignedUserId ?? ''}
+                        disabled={assigning}
+                        onChange={(e) => handleAssign(e.target.value)}
+                        className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs text-gray-700"
+                      >
+                        <option value="">{t('unassigned')}</option>
+                        {teamMembers.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {[member.firstName, member.lastName].filter(Boolean).join(' ') || member.email}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </>
               )}
             </div>

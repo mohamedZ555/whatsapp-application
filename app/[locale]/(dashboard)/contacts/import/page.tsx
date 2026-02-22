@@ -42,7 +42,7 @@ export default function ImportContactsPage() {
     <div className="max-w-3xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">{t('importContacts')}</h1>
       <form onSubmit={handleImport} className="bg-white rounded-2xl border border-emerald-100 shadow-sm p-6">
-        <p className="text-sm text-gray-500 mb-3">One WhatsApp number per line.</p>
+        <p className="text-sm text-gray-500 mb-3">{t('importHint')}</p>
         <textarea
           rows={10}
           value={bulk}
@@ -56,7 +56,7 @@ export default function ImportContactsPage() {
           </button>
           {summary && (
             <p className="text-sm text-gray-600">
-              Imported: <span className="font-semibold text-emerald-700">{summary.created}</span>, Failed: <span className="font-semibold text-red-600">{summary.failed}</span>
+              {t('imported')}: <span className="font-semibold text-emerald-700">{summary.created}</span>, {t('failed')}: <span className="font-semibold text-red-600">{summary.failed}</span>
             </p>
           )}
         </div>

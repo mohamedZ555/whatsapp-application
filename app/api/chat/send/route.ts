@@ -4,16 +4,19 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { sendTextMessage, sendMediaMessage } from '@/lib/whatsapp/api';
 import { getPusherServer, PUSHER_EVENTS } from '@/lib/pusher';
+import { getActorFromSession, getContactScope } from '@/lib/rbac';
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const vendorId = (session.user as any).vendorId;
+  const actor = getActorFromSession(session);
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { contactId, messageType, messageContent, mediaData } = await req.json();
 
-  const contact = await prisma.contact.findFirst({ where: { id: contactId, vendorId } });
+  const contact = await prisma.contact.findFirst({ where: { id: contactId, ...getContactScope(actor) } });
   if (!contact) return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+  const vendorId = contact.vendorId;
 
   // Get vendor WhatsApp settings
   const settings = await prisma.vendorSetting.findMany({

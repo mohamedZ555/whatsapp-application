@@ -3,44 +3,36 @@ import { authOptions } from '@/lib/auth';
 import { Link } from '@/i18n/navigation';
 import { redirect } from 'next/navigation';
 import { USER_ROLES } from '@/lib/constants';
+import LocaleSwitcher from '@/components/layout/locale-switcher';
+import AdminSidebar from '@/components/layout/admin-sidebar';
+import { getLocale, getTranslations } from 'next-intl/server';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
-  if (!session?.user || (session.user as any).roleId !== USER_ROLES.SUPER_ADMIN) redirect('/login');
+  const roleId = (session?.user as { roleId?: number } | undefined)?.roleId;
+  if (!session?.user || roleId !== USER_ROLES.SUPER_ADMIN) redirect('/login');
+  const locale = await getLocale();
+  const tAdmin = await getTranslations('admin');
+  const isRtl = locale === 'ar';
 
   return (
-    <div className="flex h-screen bg-gradient-to-b from-slate-100 via-white to-slate-100">
-      <aside className="w-64 bg-slate-950 border-e border-slate-800 flex flex-col text-slate-100">
-        <div className="h-16 flex items-center px-5 border-b border-slate-800">
-          <span className="font-bold">FadaaWhats Admin</span>
-        </div>
-        <nav className="py-4 px-3 flex-1">
-          <ul className="space-y-0.5">
-            {[
-              { href: '/admin', label: 'Dashboard' },
-              { href: '/admin/vendors', label: 'Vendors' },
-              { href: '/admin/subscriptions', label: 'Subscriptions' },
-              { href: '/admin/configuration/general', label: 'Configuration' },
-              { href: '/admin/pages', label: 'Pages' },
-              { href: '/admin/translations', label: 'Translations' },
-            ].map((item) => (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className="flex items-center px-3 py-2.5 rounded-lg text-sm font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </aside>
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white/85 border-b border-slate-200 backdrop-blur flex items-center justify-end px-6">
-          <Link href="/dashboard" className="text-sm text-emerald-700 hover:underline">Vendor Dashboard</Link>
+    <div className={`flex h-screen bg-gradient-to-b from-emerald-50 via-white to-emerald-50/70 text-slate-700 ${isRtl ? 'flex-row-reverse' : ''}`}>
+      <AdminSidebar />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex h-16 items-center justify-between border-b border-emerald-100 bg-white/90 px-6 backdrop-blur">
+          <div className="text-xs font-semibold uppercase tracking-[0.1em] text-emerald-700">{tAdmin('title')}</div>
+          <div className="flex items-center gap-3">
+            <LocaleSwitcher />
+            <span className="text-sm font-semibold text-slate-700">{session.user.name ?? tAdmin('superAdministrator')}</span>
+            <Link
+              href="/dashboard"
+              className="rounded-md border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+            >
+              {tAdmin('loginAs')}
+            </Link>
+          </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="admin-console-bg flex-1 overflow-y-auto p-5">{children}</main>
       </div>
     </div>
   );

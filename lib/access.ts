@@ -6,6 +6,7 @@ export type DashboardNavItem = {
   icon: 'layout' | 'users' | 'message-circle' | 'megaphone' | 'file-text' | 'bot' | 'history' | 'shield' | 'gem' | 'settings';
   requiredPermission?: VendorPermission;
   ownerOnly?: boolean;
+  superAdminOnly?: boolean;
 };
 
 export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
@@ -19,6 +20,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
   { key: 'users', href: '/users', icon: 'shield', requiredPermission: 'manage_users' },
   { key: 'subscription', href: '/subscription', icon: 'gem', ownerOnly: true },
   { key: 'settings', href: '/settings', icon: 'settings', ownerOnly: true },
+  { key: 'adminPanel', href: '/admin', icon: 'shield', superAdminOnly: true },
 ];
 
 export function canAccessDashboardItem(
@@ -26,6 +28,8 @@ export function canAccessDashboardItem(
   permissions: string[] | undefined,
   item: DashboardNavItem
 ): boolean {
+  if (item.superAdminOnly) return roleId === USER_ROLES.SUPER_ADMIN;
+  if (roleId === USER_ROLES.SUPER_ADMIN) return true;
   if (roleId === USER_ROLES.VENDOR) return true;
   if (roleId !== USER_ROLES.VENDOR_USER) return false;
   if (item.ownerOnly) return false;
@@ -38,6 +42,7 @@ export function canAccessVendorPath(
   roleId: number | undefined,
   permissions: string[] | undefined
 ): boolean {
+  if (roleId === USER_ROLES.SUPER_ADMIN) return true;
   if (roleId === USER_ROLES.VENDOR) return true;
   if (roleId !== USER_ROLES.VENDOR_USER) return false;
 

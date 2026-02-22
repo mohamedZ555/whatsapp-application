@@ -3,13 +3,13 @@ import { Link } from '@/i18n/navigation';
 
 export default async function TemplateCreatePage() {
   const t = await getTranslations('templates');
+  const tc = await getTranslations('common');
 
   return (
     <div className="max-w-3xl bg-white rounded-2xl border border-emerald-100 shadow-sm p-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-3">{t('createTemplate')}</h1>
       <p className="text-sm text-gray-600 mb-5">
-        Template creation is managed from WhatsApp Business Manager. After creating a template there,
-        return here and use Sync Templates to pull approved templates into your workspace.
+        {t('createTemplateHint')}
       </p>
       <div className="flex gap-3">
         <a
@@ -18,10 +18,10 @@ export default async function TemplateCreatePage() {
           rel="noreferrer"
           className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"
         >
-          Open Business Manager
+          {t('openBusinessManager')}
         </a>
         <Link href="/templates" className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">
-          Back to Templates
+          {tc('back')}
         </Link>
       </div>
     </div>

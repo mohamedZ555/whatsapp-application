@@ -3,19 +3,23 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkLimit } from '@/lib/permissions';
+import { getActorFromSession, getContactScope, getVendorOwnerUserId, isVendorEmployee } from '@/lib/rbac';
+import { USER_ROLES } from '@/lib/constants';
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const vendorId = (session.user as any).vendorId;
+  const actor = getActorFromSession(session);
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { searchParams } = new URL(req.url);
   const page = parseInt(searchParams.get('page') ?? '1');
   const limit = parseInt(searchParams.get('limit') ?? '25');
   const search = searchParams.get('search') ?? '';
   const groupId = searchParams.get('groupId');
+  const selectedVendorId = searchParams.get('vendorId') ?? undefined;
 
-  const where: any = { vendorId, status: { not: 5 } };
+  const where: any = { ...getContactScope(actor, selectedVendorId), status: { not: 5 } };
   if (search) {
     where.OR = [
       { firstName: { contains: search, mode: 'insensitive' } },
@@ -49,18 +53,38 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const vendorId = (session.user as any).vendorId;
+  const actor = getActorFromSession(session);
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (isVendorEmployee(actor)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const body = await req.json();
+  const vendorId =
+    actor.roleId === USER_ROLES.SUPER_ADMIN
+      ? (body.vendorId ?? actor.vendorId)
+      : actor.vendorId;
+  if (!vendorId) return NextResponse.json({ error: 'No vendor assigned.' }, { status: 403 });
 
   const canAdd = await checkLimit(vendorId, 'contacts');
   if (!canAdd) return NextResponse.json({ error: 'Contact limit reached. Please upgrade.' }, { status: 403 });
 
-  const body = await req.json();
-  const { firstName, lastName, email, waId, phoneNumber, countryId, groupIds } = body;
+  const { firstName, lastName, email, waId, phoneNumber, countryId, groupIds, assignedUserId } = body;
 
   if (!waId) return NextResponse.json({ error: 'Phone number (waId) is required.' }, { status: 400 });
 
   const existing = await prisma.contact.findUnique({ where: { vendorId_waId: { vendorId, waId } } });
   if (existing) return NextResponse.json({ error: 'Contact with this number already exists.' }, { status: 409 });
+
+  let resolvedAssignedUserId: string | null = null;
+  if (assignedUserId) {
+    const assignee = await prisma.user.findFirst({
+      where: { id: assignedUserId, vendorId, status: 1 },
+      select: { id: true },
+    });
+    if (!assignee) return NextResponse.json({ error: 'Assigned user not found.' }, { status: 400 });
+    resolvedAssignedUserId = assignee.id;
+  } else {
+    resolvedAssignedUserId = await getVendorOwnerUserId(vendorId);
+  }
 
   const contact = await prisma.contact.create({
     data: {
@@ -71,6 +95,7 @@ export async function POST(req: NextRequest) {
       waId,
       phoneNumber: phoneNumber ?? null,
       countryId: countryId ?? null,
+      assignedUserId: resolvedAssignedUserId,
     },
   });
 

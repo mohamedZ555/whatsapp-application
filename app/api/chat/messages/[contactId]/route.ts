@@ -2,22 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { getActorFromSession, getContactScope } from '@/lib/rbac';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ contactId: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const vendorId = (session.user as any).vendorId;
+  const actor = getActorFromSession(session);
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { contactId } = await params;
   const cursor = new URL(req.url).searchParams.get('cursor');
 
-  const contact = await prisma.contact.findFirst({ where: { id: contactId, vendorId } });
+  const contact = await prisma.contact.findFirst({ where: { id: contactId, ...getContactScope(actor) } });
   if (!contact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Mark as read
   await prisma.contact.update({ where: { id: contactId }, data: { unreadMessagesCount: 0 } });
 
   const messages = await prisma.whatsappMessageLog.findMany({
-    where: { contactId, vendorId },
+    where: { contactId, vendorId: contact.vendorId },
     orderBy: { createdAt: 'desc' },
     take: 30,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
