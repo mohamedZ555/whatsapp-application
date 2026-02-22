@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tail:install react incons for icons)",
+      "Bash(tail:*)",
+      "Bash(cd:*)",
+      "Bash(head:*)",
+      "Bash(grep error TS:*)",
+      "Bash(cd /d/whatsapp-application && npx prisma generate 2>&1)",
+      "Bash(cd /d/whatsapp-application && npm install @prisma/adapter-pg pg @types/pg --legacy-peer-deps 2>&1)",
+      "Bash(cd D:/whatsapp-application && npx prisma generate 2>&1)",
+      "Bash(echo done:*)"
+    ]
+  }
+}
