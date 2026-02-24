@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import type { Prisma } from '@prisma/client';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkLimit } from '@/lib/permissions';
-import { getActorFromSession, getContactScope, getVendorOwnerUserId, isVendorEmployee } from '@/lib/rbac';
-import { USER_ROLES } from '@/lib/constants';
+import {
+  getActorFromSession,
+  getContactScope,
+  getVendorOwnerUserId,
+  isVendorEmployee,
+  resolveRequiredVendorId,
+  shouldBypassPlanLimits,
+} from '@/lib/rbac';
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -19,7 +26,7 @@ export async function GET(req: NextRequest) {
   const groupId = searchParams.get('groupId');
   const selectedVendorId = searchParams.get('vendorId') ?? undefined;
 
-  const where: any = { ...getContactScope(actor, selectedVendorId), status: { not: 5 } };
+  const where: Prisma.ContactWhereInput = { ...getContactScope(actor, selectedVendorId), status: { not: 5 } };
   if (search) {
     where.OR = [
       { firstName: { contains: search, mode: 'insensitive' } },
@@ -58,14 +65,13 @@ export async function POST(req: NextRequest) {
   if (isVendorEmployee(actor)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await req.json();
-  const vendorId =
-    actor.roleId === USER_ROLES.SUPER_ADMIN
-      ? (body.vendorId ?? actor.vendorId)
-      : actor.vendorId;
+  const vendorId = resolveRequiredVendorId(actor, body.vendorId);
   if (!vendorId) return NextResponse.json({ error: 'No vendor assigned.' }, { status: 403 });
 
-  const canAdd = await checkLimit(vendorId, 'contacts');
-  if (!canAdd) return NextResponse.json({ error: 'Contact limit reached. Please upgrade.' }, { status: 403 });
+  if (!shouldBypassPlanLimits(actor)) {
+    const canAdd = await checkLimit(vendorId, 'contacts');
+    if (!canAdd) return NextResponse.json({ error: 'Contact limit reached. Please upgrade.' }, { status: 403 });
+  }
 
   const { firstName, lastName, email, waId, phoneNumber, countryId, groupIds, assignedUserId } = body;
 

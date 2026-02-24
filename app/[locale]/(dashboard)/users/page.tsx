@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 import { USER_ROLES, VENDOR_PERMISSIONS } from '@/lib/constants';
@@ -9,7 +9,10 @@ type UserRow = {
   id: string;
   firstName: string;
   lastName: string;
+  username: string;
   email: string;
+  mobileNumber?: string | null;
+  vendorId?: string | null;
   roleId: number;
   status: number;
   vendor?: { id: string; title: string | null; uid: string };
@@ -35,13 +38,43 @@ type UserFormState = {
   permissions: string[];
 };
 
+type UserEditState = {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string;
+  mobileNumber: string;
+  roleId: number;
+  status: number;
+  vendorId: string;
+  permissions: string[];
+  password: string;
+};
+
+type ExtendedSessionUser = {
+  id: string;
+  roleId?: number;
+  vendorId?: string | null;
+};
+
+function getApiErrorMessage(data: unknown, fallback: string): string {
+  if (typeof data === 'object' && data && 'error' in data) {
+    const error = (data as { error?: unknown }).error;
+    if (typeof error === 'string' && error.trim().length > 0) return error;
+  }
+  return fallback;
+}
+
 export default function UsersPage() {
   const t = useTranslations('users');
   const tc = useTranslations('common');
   const { data: session } = useSession();
+  const sessionUser = session?.user as ExtendedSessionUser | undefined;
 
-  const roleId = (session?.user as any)?.roleId as number | undefined;
-  const sessionVendorId = (session?.user as any)?.vendorId as string | undefined;
+  const roleId = sessionUser?.roleId;
+  const sessionUserId = sessionUser?.id;
+  const sessionVendorId = sessionUser?.vendorId ?? undefined;
   const isSuperAdmin = roleId === USER_ROLES.SUPER_ADMIN;
   const isVendorAdmin = roleId === USER_ROLES.VENDOR;
 
@@ -50,7 +83,11 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<UserEditState | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [form, setForm] = useState<UserFormState>({
     firstName: '',
@@ -77,16 +114,16 @@ export default function UsersPage() {
     return [{ id: USER_ROLES.VENDOR_USER, label: t('employeeRole') }];
   }, [isSuperAdmin, t]);
 
-  async function fetchUsers() {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     const query = isSuperAdmin ? '' : sessionVendorId ? `?vendorId=${encodeURIComponent(sessionVendorId)}` : '';
     const res = await fetch(`/api/users${query}`);
     const data = await res.json();
     setRows(Array.isArray(data) ? data : []);
     setLoading(false);
-  }
+  }, [isSuperAdmin, sessionVendorId]);
 
-  async function fetchVendors() {
+  const fetchVendors = useCallback(async () => {
     if (!isSuperAdmin) return;
     const adminUsers = await fetch('/api/users?roleId=2').then((r) => r.json());
     const found = new Map<string, VendorOption>();
@@ -96,12 +133,15 @@ export default function UsersPage() {
       }
     }
     setVendors(Array.from(found.values()));
-  }
+  }, [isSuperAdmin]);
 
   useEffect(() => {
-    fetchUsers();
-    fetchVendors();
-  }, [isSuperAdmin, sessionVendorId]);
+    const timer = setTimeout(() => {
+      void fetchUsers();
+      void fetchVendors();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchUsers, fetchVendors]);
 
   async function createUser(e: React.FormEvent) {
     e.preventDefault();
@@ -133,6 +173,91 @@ export default function UsersPage() {
       vendorTitle: '',
       permissions: ['manage_chat'],
     });
+    fetchUsers();
+    fetchVendors();
+  }
+
+  function canManageRow(row: UserRow): boolean {
+    if (isSuperAdmin) return true;
+    if (isVendorAdmin) return row.roleId === USER_ROLES.VENDOR_USER && row.vendorId === sessionVendorId;
+    return false;
+  }
+
+  function startEdit(row: UserRow) {
+    setError('');
+    setActionError('');
+    setShowForm(false);
+    setEditing({
+      userId: row.id,
+      firstName: row.firstName ?? '',
+      lastName: row.lastName ?? '',
+      username: row.username ?? '',
+      email: row.email ?? '',
+      mobileNumber: row.mobileNumber ?? '',
+      roleId: row.roleId,
+      status: row.status,
+      vendorId: row.vendorId ?? row.vendor?.id ?? '',
+      permissions: row.vendorUserDetail?.permissions ?? [],
+      password: '',
+    });
+  }
+
+  async function updateUser(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    setUpdating(true);
+    setActionError('');
+
+    const payload: Record<string, unknown> = {
+      userId: editing.userId,
+      firstName: editing.firstName,
+      lastName: editing.lastName,
+      username: editing.username,
+      email: editing.email,
+      mobileNumber: editing.mobileNumber,
+      status: editing.status,
+      permissions: editing.permissions,
+    };
+
+    if (editing.password.trim().length > 0) {
+      payload.password = editing.password;
+    }
+
+    const res = await fetch('/api/users', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    setUpdating(false);
+
+    if (!res.ok) {
+      setActionError(getApiErrorMessage(data, 'Failed to update user.'));
+      return;
+    }
+
+    setEditing(null);
+    fetchUsers();
+    fetchVendors();
+  }
+
+  async function deleteUser(id: string) {
+    if (!confirm(tc('confirmDelete'))) return;
+    setDeletingId(id);
+    setActionError('');
+
+    const res = await fetch(`/api/users?userId=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
+    setDeletingId(null);
+
+    if (!res.ok) {
+      setActionError(getApiErrorMessage(data, 'Failed to delete user.'));
+      return;
+    }
+
+    if (editing?.userId === id) {
+      setEditing(null);
+    }
     fetchUsers();
     fetchVendors();
   }
@@ -304,6 +429,142 @@ export default function UsersPage() {
         </form>
       )}
 
+      {editing && canManageUsers && (
+        <form onSubmit={updateUser} className="mb-6 grid grid-cols-1 gap-4 rounded-2xl border border-blue-100 bg-white p-6 md:grid-cols-2">
+          {(actionError || error) && (
+            <div className="md:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {actionError || error}
+            </div>
+          )}
+          <div className="md:col-span-2 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-gray-900">{tc('edit')} {t('title')}</h2>
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+            >
+              {tc('cancel')}
+            </button>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">{t('name')}</label>
+            <input
+              required
+              value={editing.firstName}
+              onChange={(e) => setEditing((s) => (s ? { ...s, firstName: e.target.value } : s))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">{t('name')}</label>
+            <input
+              required
+              value={editing.lastName}
+              onChange={(e) => setEditing((s) => (s ? { ...s, lastName: e.target.value } : s))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">{t('username')}</label>
+            <input
+              required
+              value={editing.username}
+              onChange={(e) => setEditing((s) => (s ? { ...s, username: e.target.value } : s))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">{t('email')}</label>
+            <input
+              required
+              type="email"
+              value={editing.email}
+              onChange={(e) => setEditing((s) => (s ? { ...s, email: e.target.value } : s))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">{t('mobile')}</label>
+            <input
+              value={editing.mobileNumber}
+              onChange={(e) => setEditing((s) => (s ? { ...s, mobileNumber: e.target.value } : s))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">{t('status')}</label>
+            <select
+              value={editing.status}
+              onChange={(e) => setEditing((s) => (s ? { ...s, status: Number(e.target.value) } : s))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value={1}>{tc('active')}</option>
+              <option value={2}>{tc('inactive')}</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">{t('password')}</label>
+            <input
+              type="password"
+              value={editing.password}
+              onChange={(e) => setEditing((s) => (s ? { ...s, password: e.target.value } : s))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              placeholder="Leave blank to keep current password"
+            />
+          </div>
+          {editing.roleId === USER_ROLES.VENDOR_USER && (
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-gray-700">{t('permissions')}</label>
+              <div className="flex flex-wrap gap-2">
+                {VENDOR_PERMISSIONS.map((perm) => {
+                  const checked = editing.permissions.includes(perm);
+                  return (
+                    <label
+                      key={perm}
+                      className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs ${checked ? 'border-emerald-300 bg-emerald-100 text-emerald-800' : 'border-gray-300 bg-white text-gray-600'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="hidden"
+                        checked={checked}
+                        onChange={(e) =>
+                          setEditing((s) =>
+                            s
+                              ? {
+                                  ...s,
+                                  permissions: e.target.checked
+                                    ? [...s.permissions, perm]
+                                    : s.permissions.filter((p) => p !== perm),
+                                }
+                              : s
+                          )
+                        }
+                      />
+                      {perm}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <div className="md:col-span-2">
+            <button
+              type="submit"
+              disabled={updating}
+              className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              {updating ? tc('saving') : tc('update')}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {actionError && !editing && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {actionError}
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead className="border-b border-emerald-100 bg-emerald-50/60">
@@ -313,21 +574,24 @@ export default function UsersPage() {
               <th className="px-4 py-3 text-start font-medium text-gray-600">{t('role')}</th>
               <th className="px-4 py-3 text-start font-medium text-gray-600">{t('permissions')}</th>
               <th className="px-4 py-3 text-start font-medium text-gray-600">{tc('status')}</th>
+              {canManageUsers && <th className="px-4 py-3 text-start font-medium text-gray-600">{tc('actions')}</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {loading && (
               <tr>
-                <td colSpan={5} className="py-10 text-center text-gray-400">{tc('loading')}</td>
+                <td colSpan={canManageUsers ? 6 : 5} className="py-10 text-center text-gray-400">{tc('loading')}</td>
               </tr>
             )}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-10 text-center text-gray-400">{tc('noData')}</td>
+                <td colSpan={canManageUsers ? 6 : 5} className="py-10 text-center text-gray-400">{tc('noData')}</td>
               </tr>
             )}
             {rows.map((row) => {
               const perms = row.vendorUserDetail?.permissions ?? [];
+              const canManageThisRow = canManageRow(row);
+              const isCurrentUser = row.id === sessionUserId;
               return (
                 <tr key={row.id} className="hover:bg-emerald-50/40">
                   <td className="px-4 py-3 font-medium text-gray-900">{row.firstName} {row.lastName}</td>
@@ -343,6 +607,28 @@ export default function UsersPage() {
                       {row.status === 1 ? tc('active') : tc('inactive')}
                     </span>
                   </td>
+                  {canManageUsers && (
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3 text-xs">
+                        <button
+                          type="button"
+                          disabled={!canManageThisRow}
+                          onClick={() => startEdit(row)}
+                          className="text-blue-600 hover:underline disabled:cursor-not-allowed disabled:text-gray-400"
+                        >
+                          {tc('edit')}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!canManageThisRow || isCurrentUser || deletingId === row.id}
+                          onClick={() => deleteUser(row.id)}
+                          className="text-red-600 hover:underline disabled:cursor-not-allowed disabled:text-gray-400"
+                        >
+                          {deletingId === row.id ? tc('loading') : tc('delete')}
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               );
             })}

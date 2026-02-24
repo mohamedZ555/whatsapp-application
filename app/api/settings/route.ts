@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { USER_ROLES } from '@/lib/constants';
-import { getActorFromSession } from '@/lib/rbac';
+import { getActorFromSession, resolveRequiredVendorId } from '@/lib/rbac';
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -13,9 +13,7 @@ export async function GET(req: NextRequest) {
   if (actor.roleId !== USER_ROLES.SUPER_ADMIN && actor.roleId !== USER_ROLES.VENDOR) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-  const vendorId = actor.roleId === USER_ROLES.SUPER_ADMIN
-    ? new URL(req.url).searchParams.get('vendorId') ?? actor.vendorId
-    : actor.vendorId;
+  const vendorId = resolveRequiredVendorId(actor, new URL(req.url).searchParams.get('vendorId'));
   if (!vendorId) return NextResponse.json({ error: 'Vendor is required.' }, { status: 400 });
 
   const settings = await prisma.vendorSetting.findMany({ where: { vendorId } });
@@ -35,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const requestedVendorId = typeof body.vendorId === 'string' ? body.vendorId : null;
-  const vendorId = actor.roleId === USER_ROLES.SUPER_ADMIN ? (requestedVendorId ?? actor.vendorId) : actor.vendorId;
+  const vendorId = resolveRequiredVendorId(actor, requestedVendorId);
   if (!vendorId) return NextResponse.json({ error: 'Vendor is required.' }, { status: 400 });
 
   const payload = Object.fromEntries(

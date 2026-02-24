@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import type { Prisma } from '@prisma/client';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { getActorFromSession, isSuperAdmin } from '@/lib/rbac';
+import { getActorFromSession, isSuperAdmin, resolveOptionalVendorFilter } from '@/lib/rbac';
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -11,7 +12,10 @@ export async function GET(req: NextRequest) {
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const vendorId = isSuperAdmin(actor) ? searchParams.get('vendorId') : actor.vendorId;
+  const vendorId = resolveOptionalVendorFilter(actor, searchParams.get('vendorId'));
+  if (!vendorId && !isSuperAdmin(actor)) {
+    return NextResponse.json({ error: 'Vendor is required.' }, { status: 400 });
+  }
   const page = parseInt(searchParams.get('page') ?? '1');
   const limit = parseInt(searchParams.get('limit') ?? '25');
   const isIncoming = searchParams.get('isIncoming');
@@ -19,7 +23,7 @@ export async function GET(req: NextRequest) {
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
 
-  const where: any = vendorId ? { vendorId } : {};
+  const where: Prisma.WhatsappMessageLogWhereInput = vendorId ? { vendorId } : {};
   if (isIncoming !== null && isIncoming !== '') where.isIncomingMessage = isIncoming === 'true';
   if (status) where.status = status;
   if (startDate || endDate) {

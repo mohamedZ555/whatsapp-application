@@ -1,32 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import bcrypt from 'bcryptjs';
+import type { Prisma } from '@prisma/client';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { USER_ROLES } from '@/lib/constants';
 import { checkLimit } from '@/lib/permissions';
-import { canManageVendorUsers, getActorFromSession, isSuperAdmin, isVendorAdmin } from '@/lib/rbac';
+import {
+  canManageVendorUsers,
+  getActorFromSession,
+  isSuperAdmin,
+  isVendorAdmin,
+  resolveOptionalVendorFilter,
+  resolveRequiredVendorId,
+  shouldBypassPlanLimits,
+} from '@/lib/rbac';
+
+function normalizeString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizePermissions(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
+function canManageTargetUser(
+  actor: { roleId: number; vendorId: string | null },
+  target: { roleId: number; vendorId: string | null }
+): boolean {
+  if (actor.roleId === USER_ROLES.SUPER_ADMIN) return true;
+  if (actor.roleId !== USER_ROLES.VENDOR) return false;
+  if (!actor.vendorId) return false;
+  return target.roleId === USER_ROLES.VENDOR_USER && target.vendorId === actor.vendorId;
+}
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const actor = getActorFromSession(session);
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isSuperAdmin(actor) && !isVendorAdmin(actor)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const searchParams = new URL(req.url).searchParams;
-  const vendorIdParam = searchParams.get('vendorId');
+  const vendorIdParam = searchParams.get('vendorId') ?? undefined;
   const roleParam = searchParams.get('roleId');
-
-  let vendorIdFilter: string | undefined;
-  if (isSuperAdmin(actor)) {
-    vendorIdFilter = vendorIdParam ?? undefined;
-  } else if (isVendorAdmin(actor)) {
-    vendorIdFilter = actor.vendorId ?? undefined;
-  } else {
+  const vendorIdFilter = resolveOptionalVendorFilter(actor, vendorIdParam);
+  if (!vendorIdFilter && !isSuperAdmin(actor)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const roleId = roleParam ? parseInt(roleParam, 10) : undefined;
-  const where: any = {
+  const where: Prisma.UserWhereInput = {
     ...(vendorIdFilter ? { vendorId: vendorIdFilter } : {}),
     ...(roleId ? { roleId } : {}),
     status: { not: 5 },
@@ -103,7 +134,7 @@ export async function POST(req: NextRequest) {
       data: { vendorId: vendor.id, planId: 'free', status: 'active' },
     });
   } else {
-    finalVendorId = requestedVendorId ?? actor.vendorId;
+    finalVendorId = resolveRequiredVendorId(actor, requestedVendorId) ?? null;
     if (!finalVendorId) {
       return NextResponse.json({ error: 'Target vendor is required.' }, { status: 400 });
     }
@@ -111,9 +142,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden for this vendor.' }, { status: 403 });
     }
 
-    const canAdd = await checkLimit(finalVendorId, 'teamMembers');
-    if (!canAdd) {
-      return NextResponse.json({ error: 'Team member limit reached for subscription.' }, { status: 403 });
+    if (!shouldBypassPlanLimits(actor)) {
+      const canAdd = await checkLimit(finalVendorId, 'teamMembers');
+      if (!canAdd) {
+        return NextResponse.json({ error: 'Team member limit reached for subscription.' }, { status: 403 });
+      }
     }
   }
 
@@ -143,4 +176,175 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ success: true, data: user });
+}
+
+export async function PUT(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  const actor = getActorFromSession(session);
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isSuperAdmin(actor) && !isVendorAdmin(actor)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const body = await req.json();
+  const userId = normalizeString(body?.userId);
+  if (!userId) return NextResponse.json({ error: 'userId is required.' }, { status: 400 });
+
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { vendorUserDetail: true },
+  });
+  if (!target || target.status === 5) return NextResponse.json({ error: 'User not found.' }, { status: 404 });
+  if (!canManageTargetUser(actor, target)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const requestedRoleId = body?.roleId;
+  const parsedRoleId = requestedRoleId !== undefined ? Number(requestedRoleId) : undefined;
+  if (requestedRoleId !== undefined) {
+    if (!Number.isInteger(parsedRoleId)) {
+      return NextResponse.json({ error: 'Invalid role.' }, { status: 400 });
+    }
+    const allowedRoles: number[] = [USER_ROLES.SUPER_ADMIN, USER_ROLES.VENDOR, USER_ROLES.VENDOR_USER];
+    if (!allowedRoles.includes(parsedRoleId!)) {
+      return NextResponse.json({ error: 'Invalid role.' }, { status: 400 });
+    }
+    if (!isSuperAdmin(actor)) {
+      return NextResponse.json({ error: 'Only super admin can update roles.' }, { status: 403 });
+    }
+  }
+
+  const requestedStatus = body?.status;
+  const parsedStatus = requestedStatus !== undefined ? Number(requestedStatus) : undefined;
+  if (requestedStatus !== undefined && !Number.isInteger(parsedStatus)) {
+    return NextResponse.json({ error: 'Invalid status value.' }, { status: 400 });
+  }
+
+  if (target.id === actor.userId) {
+    if (parsedRoleId !== undefined && parsedRoleId !== target.roleId) {
+      return NextResponse.json({ error: 'You cannot change your own role.' }, { status: 403 });
+    }
+    if (parsedStatus === 5) {
+      return NextResponse.json({ error: 'You cannot delete your own account.' }, { status: 403 });
+    }
+  }
+
+  const nextRoleId = parsedRoleId ?? target.roleId;
+  const requestedVendorId =
+    body?.vendorId === null ? null : normalizeString(body?.vendorId) ?? undefined;
+
+  let nextVendorId = target.vendorId;
+  if (nextRoleId === USER_ROLES.VENDOR || nextRoleId === USER_ROLES.VENDOR_USER) {
+    const resolvedVendorId = resolveRequiredVendorId(
+      actor,
+      requestedVendorId ?? target.vendorId ?? undefined
+    );
+    if (!resolvedVendorId) {
+      return NextResponse.json({ error: 'Target vendor is required.' }, { status: 400 });
+    }
+    if (!canManageVendorUsers(actor, resolvedVendorId)) {
+      return NextResponse.json({ error: 'Forbidden for this vendor.' }, { status: 403 });
+    }
+    nextVendorId = resolvedVendorId;
+  } else if (nextRoleId === USER_ROLES.SUPER_ADMIN && requestedVendorId !== undefined) {
+    nextVendorId = requestedVendorId;
+  }
+
+  const nextEmail = normalizeString(body?.email)?.toLowerCase();
+  const nextUsername = normalizeString(body?.username)?.toLowerCase();
+
+  if (nextEmail && nextEmail !== target.email.toLowerCase()) {
+    const emailTaken = await prisma.user.findFirst({
+      where: { email: nextEmail, id: { not: target.id } },
+      select: { id: true },
+    });
+    if (emailTaken) return NextResponse.json({ error: 'Email already in use.' }, { status: 409 });
+  }
+
+  if (nextUsername && nextUsername !== target.username.toLowerCase()) {
+    const usernameTaken = await prisma.user.findFirst({
+      where: { username: nextUsername, id: { not: target.id } },
+      select: { id: true },
+    });
+    if (usernameTaken) return NextResponse.json({ error: 'Username already in use.' }, { status: 409 });
+  }
+
+  const hashedPassword = normalizeString(body?.password)
+    ? await bcrypt.hash(String(body.password), 12)
+    : undefined;
+
+  await prisma.user.update({
+    where: { id: target.id },
+    data: {
+      firstName: normalizeString(body?.firstName) ?? target.firstName,
+      lastName: normalizeString(body?.lastName) ?? target.lastName,
+      username: nextUsername ?? target.username,
+      email: nextEmail ?? target.email,
+      mobileNumber:
+        body?.mobileNumber === null
+          ? null
+          : normalizeString(body?.mobileNumber) ?? target.mobileNumber,
+      status: parsedStatus ?? target.status,
+      roleId: nextRoleId,
+      vendorId: nextVendorId,
+      ...(hashedPassword ? { password: hashedPassword } : {}),
+    },
+  });
+
+  const permissions = normalizePermissions(body?.permissions);
+  if (nextRoleId === USER_ROLES.VENDOR_USER && nextVendorId) {
+    await prisma.vendorUser.upsert({
+      where: { userId: target.id },
+      update: {
+        vendorId: nextVendorId,
+        ...(permissions ? { permissions } : {}),
+      },
+      create: {
+        userId: target.id,
+        vendorId: nextVendorId,
+        permissions: permissions ?? [],
+      },
+    });
+  } else {
+    await prisma.vendorUser.deleteMany({ where: { userId: target.id } });
+  }
+
+  const updated = await prisma.user.findUnique({
+    where: { id: target.id },
+    include: {
+      role: { select: { id: true, title: true } },
+      vendor: { select: { id: true, title: true, uid: true } },
+      vendorUserDetail: true,
+    },
+  });
+
+  return NextResponse.json({ success: true, data: updated });
+}
+
+export async function DELETE(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  const actor = getActorFromSession(session);
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isSuperAdmin(actor) && !isVendorAdmin(actor)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const userId = normalizeString(new URL(req.url).searchParams.get('userId'));
+  if (!userId) return NextResponse.json({ error: 'userId is required.' }, { status: 400 });
+  if (userId === actor.userId) {
+    return NextResponse.json({ error: 'You cannot delete your own account.' }, { status: 403 });
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, roleId: true, vendorId: true, status: true },
+  });
+  if (!target || target.status === 5) return NextResponse.json({ error: 'User not found.' }, { status: 404 });
+  if (!canManageTargetUser(actor, target)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  await prisma.user.update({
+    where: { id: target.id },
+    data: { status: 5 },
+  });
+  await prisma.vendorUser.deleteMany({ where: { userId: target.id } });
+
+  return NextResponse.json({ success: true });
 }

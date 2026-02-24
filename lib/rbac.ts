@@ -11,11 +11,18 @@ export type AppActor = {
 
 export function getActorFromSession(session: Session | null): AppActor | null {
   if (!session?.user) return null;
+  const sessionUser = session.user as Session['user'] & {
+    roleId?: number;
+    vendorId?: string | null;
+    permissions?: string[];
+  };
+  if (typeof sessionUser.roleId !== 'number') return null;
+
   return {
     userId: session.user.id,
-    roleId: (session.user as any).roleId as number,
-    vendorId: ((session.user as any).vendorId as string | null) ?? null,
-    permissions: (((session.user as any).permissions as string[]) ?? []),
+    roleId: sessionUser.roleId,
+    vendorId: sessionUser.vendorId ?? null,
+    permissions: Array.isArray(sessionUser.permissions) ? sessionUser.permissions : [],
   };
 }
 
@@ -29,6 +36,39 @@ export function isVendorAdmin(actor: AppActor): boolean {
 
 export function isVendorEmployee(actor: AppActor): boolean {
   return actor.roleId === USER_ROLES.VENDOR_USER;
+}
+
+function normalizeVendorId(vendorId: string | null | undefined): string | undefined {
+  if (!vendorId) return undefined;
+  const trimmed = vendorId.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+export function resolveOptionalVendorFilter(
+  actor: AppActor,
+  requestedVendorId?: string | null
+): string | undefined {
+  if (isSuperAdmin(actor)) {
+    return normalizeVendorId(requestedVendorId ?? undefined);
+  }
+  return normalizeVendorId(actor.vendorId ?? undefined);
+}
+
+export function resolveRequiredVendorId(
+  actor: AppActor,
+  requestedVendorId?: string | null
+): string | undefined {
+  if (isSuperAdmin(actor)) {
+    return (
+      normalizeVendorId(requestedVendorId ?? undefined) ??
+      normalizeVendorId(actor.vendorId ?? undefined)
+    );
+  }
+  return normalizeVendorId(actor.vendorId ?? undefined);
+}
+
+export function shouldBypassPlanLimits(actor: AppActor): boolean {
+  return isSuperAdmin(actor);
 }
 
 export function canManageVendorUsers(actor: AppActor, targetVendorId: string): boolean {
@@ -62,4 +102,3 @@ export async function getVendorOwnerUserId(vendorId: string): Promise<string | n
   });
   return owner?.id ?? null;
 }
-
