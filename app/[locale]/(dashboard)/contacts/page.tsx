@@ -11,24 +11,37 @@ export default function ContactsPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [assignedFilter, setAssignedFilter] = useState('');
+  const [sortBy, setSortBy] = useState('created');
   const [loading, setLoading] = useState(true);
 
   async function fetchContacts() {
     setLoading(true);
-    const res = await fetch(`/api/contacts?page=${page}&search=${encodeURIComponent(search)}`);
+    const params = new URLSearchParams({ page: String(page) });
+    if (search) params.set('search', search);
+    if (statusFilter) params.set('status', statusFilter);
+    if (assignedFilter) params.set('assigned', assignedFilter);
+    if (sortBy) params.set('orderBy', sortBy);
+    const res = await fetch(`/api/contacts?${params.toString()}`);
     const data = await res.json();
     setContacts(data.data ?? []);
     setTotal(data.total ?? 0);
     setLoading(false);
   }
 
-  useEffect(() => { fetchContacts(); }, [page, search]);
+  useEffect(() => {
+    fetchContacts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, search, statusFilter, assignedFilter, sortBy]);
 
   async function deleteContact(id: string) {
     if (!confirm(tc('confirmDelete'))) return;
     await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
     fetchContacts();
   }
+
+  const totalPages = Math.ceil(total / 25);
 
   return (
     <div>
@@ -47,15 +60,49 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-4 p-4">
+      {/* Filter Bar */}
+      <div className="border border-gray-200 rounded-lg p-3 bg-white mb-4 flex flex-wrap gap-3 items-center">
+        {/* Search */}
         <input
           type="text"
           placeholder={t('search')}
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="w-full max-w-sm border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 min-w-[200px]"
         />
+
+        {/* Status dropdown */}
+        <select
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        >
+          <option value="">All statuses</option>
+          <option value="1">{tc('active')}</option>
+          <option value="2">{tc('inactive')}</option>
+        </select>
+
+        {/* Assigned dropdown */}
+        <select
+          value={assignedFilter}
+          onChange={(e) => { setAssignedFilter(e.target.value); setPage(1); }}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        >
+          <option value="">All</option>
+          <option value="me">Assigned to me</option>
+          <option value="none">Unassigned</option>
+        </select>
+
+        {/* Sort by dropdown */}
+        <select
+          value={sortBy}
+          onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        >
+          <option value="created">Created</option>
+          <option value="messaged">Last Messaged</option>
+          <option value="name">Name A-Z</option>
+        </select>
       </div>
 
       {/* Table */}
@@ -107,11 +154,25 @@ export default function ContactsPage() {
       </div>
 
       {/* Pagination */}
-      {total > 25 && (
+      {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 border border-gray-300 rounded text-sm disabled:opacity-50">{tc('previous')}</button>
-          <span className="text-sm text-gray-600">{tc('page')} {page} {tc('of')} {Math.ceil(total / 25)}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / 25)} className="px-3 py-1.5 border border-gray-300 rounded text-sm disabled:opacity-50">{tc('next')}</button>
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-1.5 border border-gray-300 rounded text-sm disabled:opacity-50"
+          >
+            {tc('previous')}
+          </button>
+          <span className="text-sm text-gray-600">
+            {tc('page')} {page} {tc('of')} {totalPages}
+          </span>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            className="px-3 py-1.5 border border-gray-300 rounded text-sm disabled:opacity-50"
+          >
+            {tc('next')}
+          </button>
         </div>
       )}
     </div>

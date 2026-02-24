@@ -111,6 +111,38 @@ export default function BotRepliesPage() {
     fetchReplies();
   }
 
+  async function handleDeleteReply(id: string) {
+    if (!window.confirm(tc('confirmDelete'))) return;
+    await fetch(`/api/bot-replies?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    fetchReplies();
+  }
+
+  async function handleToggleReplyStatus(reply: any) {
+    const newStatus = reply.status === 1 ? 2 : 1;
+    await fetch('/api/bot-replies', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: reply.id, status: newStatus }),
+    });
+    fetchReplies();
+  }
+
+  async function handleDeleteFlow(id: string) {
+    if (!window.confirm(tc('confirmDelete'))) return;
+    await fetch(`/api/bot-flows/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    fetchFlows();
+  }
+
+  async function handleToggleFlowStatus(flow: any) {
+    const newStatus = flow.status === 1 ? 2 : 1;
+    await fetch(`/api/bot-flows/${encodeURIComponent(flow.id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    fetchFlows();
+  }
+
   function moveStep(index: number, dir: -1 | 1) {
     const nextIndex = index + dir;
     if (nextIndex < 0 || nextIndex >= steps.length) return;
@@ -283,6 +315,20 @@ export default function BotRepliesPage() {
                       <span className="rounded bg-green-50 px-2 py-0.5 text-xs text-green-700">{r.replyType}</span>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleToggleReplyStatus(r)}
+                      className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${r.status === 1 ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    >
+                      {r.status === 1 ? tc('active') : tc('inactive')}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteReply(r.id)}
+                      className="rounded-lg bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors"
+                    >
+                      {tc('delete')}
+                    </button>
+                  </div>
                 </div>
                 {r.replyMessage && <p className="mt-2 truncate text-sm text-gray-600">{r.replyMessage}</p>}
               </div>
@@ -419,9 +465,20 @@ export default function BotRepliesPage() {
                     <p className="font-semibold text-gray-900">{flow.flowName}</p>
                     <p className="mt-1 text-xs text-gray-500">{flow.description || t('noDescription')}</p>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${flow.status === 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
-                    {flow.status === 1 ? tc('active') : tc('inactive')}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleToggleFlowStatus(flow)}
+                      className={`rounded-full px-3 py-0.5 text-xs font-medium transition-colors ${flow.status === 1 ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    >
+                      {flow.status === 1 ? tc('active') : tc('inactive')}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteFlow(flow.id)}
+                      className="rounded-lg bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors"
+                    >
+                      {tc('delete')}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

@@ -49,6 +49,15 @@ export const authOptions: NextAuthOptions = {
               // Do not block login if login-log insert fails.
             });
 
+          let vendorUid: string | null = null;
+          if (user.vendorId) {
+            const vendor = await prisma.vendor.findUnique({
+              where: { id: user.vendorId },
+              select: { uid: true },
+            });
+            vendorUid = vendor?.uid ?? null;
+          }
+
           return {
             id: user.id,
             uid: user.uid,
@@ -56,6 +65,7 @@ export const authOptions: NextAuthOptions = {
             name: `${user.firstName} ${user.lastName}`,
             roleId: user.roleId,
             vendorId: user.vendorId,
+            vendorUid,
             permissions: (user.vendorUserDetail?.permissions as string[]) ?? [],
           } as any;
         } catch (error) {
@@ -80,6 +90,7 @@ export const authOptions: NextAuthOptions = {
         token.uid = (user as any).uid;
         token.roleId = (user as any).roleId;
         token.vendorId = (user as any).vendorId;
+        token.vendorUid = (user as any).vendorUid;
         token.permissions = (user as any).permissions;
       }
       return token;
@@ -90,6 +101,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).uid = token.uid;
         (session.user as any).roleId = token.roleId;
         (session.user as any).vendorId = token.vendorId;
+        (session.user as any).vendorUid = token.vendorUid;
         (session.user as any).permissions = token.permissions;
       }
       return session;

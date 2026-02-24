@@ -14,6 +14,7 @@ import {
   MessageCircle,
   Settings,
   ShieldCheck,
+  Smartphone,
   Users,
 } from 'lucide-react';
 import { canAccessDashboardItem, DASHBOARD_NAV_ITEMS } from '@/lib/access';
@@ -29,6 +30,7 @@ const iconMap = {
   shield: ShieldCheck,
   gem: Gem,
   settings: Settings,
+  smartphone: Smartphone,
 } as const;
 
 export default function Sidebar() {

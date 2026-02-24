@@ -9,7 +9,10 @@
       "Bash(cd /d/whatsapp-application && npx prisma generate 2>&1)",
       "Bash(cd /d/whatsapp-application && npm install @prisma/adapter-pg pg @types/pg --legacy-peer-deps 2>&1)",
       "Bash(cd D:/whatsapp-application && npx prisma generate 2>&1)",
-      "Bash(echo done:*)"
+      "Bash(echo done:*)",
+      "Bash(cd /d/whatsapp-application && npx next build 2>&1)",
+      "Bash(grep:*)",
+      "Bash(grep impersonate:*)"
     ]
   }
 }

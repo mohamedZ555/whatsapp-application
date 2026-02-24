@@ -334,7 +334,7 @@ export default function UsersPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">{t('permissions')}</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">{t('role')}</label>
             <select
               value={form.roleId}
               onChange={(e) => setForm((s) => ({ ...s, roleId: Number(e.target.value) }))}
@@ -447,7 +447,7 @@ export default function UsersPage() {
             </button>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">{t('name')}</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">{t('firstNamePlaceholder')}</label>
             <input
               required
               value={editing.firstName}
@@ -456,7 +456,7 @@ export default function UsersPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">{t('name')}</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">{t('lastNamePlaceholder')}</label>
             <input
               required
               value={editing.lastName}
@@ -512,41 +512,39 @@ export default function UsersPage() {
               placeholder="Leave blank to keep current password"
             />
           </div>
-          {editing.roleId === USER_ROLES.VENDOR_USER && (
-            <div className="md:col-span-2">
-              <label className="mb-2 block text-sm font-medium text-gray-700">{t('permissions')}</label>
-              <div className="flex flex-wrap gap-2">
-                {VENDOR_PERMISSIONS.map((perm) => {
-                  const checked = editing.permissions.includes(perm);
-                  return (
-                    <label
-                      key={perm}
-                      className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs ${checked ? 'border-emerald-300 bg-emerald-100 text-emerald-800' : 'border-gray-300 bg-white text-gray-600'}`}
-                    >
-                      <input
-                        type="checkbox"
-                        className="hidden"
-                        checked={checked}
-                        onChange={(e) =>
-                          setEditing((s) =>
-                            s
-                              ? {
-                                  ...s,
-                                  permissions: e.target.checked
-                                    ? [...s.permissions, perm]
-                                    : s.permissions.filter((p) => p !== perm),
-                                }
-                              : s
-                          )
-                        }
-                      />
-                      {perm}
-                    </label>
-                  );
-                })}
-              </div>
+          <div className="md:col-span-2">
+            <label className="mb-2 block text-sm font-medium text-gray-700">{t('permissions')}</label>
+            <div className="flex flex-wrap gap-2">
+              {VENDOR_PERMISSIONS.map((perm) => {
+                const checked = editing.permissions.includes(perm);
+                return (
+                  <label
+                    key={perm}
+                    className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs ${checked ? 'border-emerald-300 bg-emerald-100 text-emerald-800' : 'border-gray-300 bg-white text-gray-600'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="hidden"
+                      checked={checked}
+                      onChange={(e) =>
+                        setEditing((s) =>
+                          s
+                            ? {
+                                ...s,
+                                permissions: e.target.checked
+                                  ? [...s.permissions, perm]
+                                  : s.permissions.filter((p) => p !== perm),
+                              }
+                            : s
+                        )
+                      }
+                    />
+                    {perm}
+                  </label>
+                );
+              })}
             </div>
-          )}
+          </div>
           <div className="md:col-span-2">
             <button
               type="submit"

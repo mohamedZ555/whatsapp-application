@@ -8,20 +8,65 @@ export default function MessageLogPage() {
   const tc = useTranslations('common');
   const [logs, setLogs] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  const [filter, setFilter] = useState({ isIncoming: '', status: '' });
   const [loading, setLoading] = useState(true);
+
+  // Filter state (pending user input before Apply)
+  const [directionInput, setDirectionInput] = useState('');
+  const [statusInput, setStatusInput] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [startDateInput, setStartDateInput] = useState('');
+  const [endDateInput, setEndDateInput] = useState('');
+
+  // Applied filter state (used in fetch)
+  const [direction, setDirection] = useState('');
+  const [status, setStatus] = useState('');
+  const [search, setSearch] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page) });
-    if (filter.isIncoming !== '') params.set('isIncoming', filter.isIncoming);
-    if (filter.status) params.set('status', filter.status);
+    if (direction !== '') params.set('isIncoming', direction);
+    if (status) params.set('status', status);
+    if (search) params.set('search', search);
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
     fetch(`/api/message-log?${params}`)
       .then(r => r.json())
-      .then(d => { setLogs(d.data ?? []); setTotal(d.total ?? 0); setLoading(false); })
+      .then(d => {
+        setLogs(d.data ?? []);
+        setTotal(d.total ?? 0);
+        setTotalPages(d.totalPages ?? 1);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
-  }, [page, filter]);
+  }, [page, direction, status, search, startDate, endDate]);
+
+  function handleApply() {
+    setDirection(directionInput);
+    setStatus(statusInput);
+    setSearch(searchInput);
+    setStartDate(startDateInput);
+    setEndDate(endDateInput);
+    setPage(1);
+  }
+
+  function handleClear() {
+    setDirectionInput('');
+    setStatusInput('');
+    setSearchInput('');
+    setStartDateInput('');
+    setEndDateInput('');
+    setDirection('');
+    setStatus('');
+    setSearch('');
+    setStartDate('');
+    setEndDate('');
+    setPage(1);
+  }
 
   const statusColor: Record<string, string> = {
     sent: 'bg-blue-50 text-blue-700',
@@ -31,6 +76,20 @@ export default function MessageLogPage() {
     received: 'bg-gray-50 text-gray-700',
   };
 
+  // Generate page number list (up to 5 around current page)
+  function getPageNumbers(): number[] {
+    const delta = 2;
+    const range: number[] = [];
+    for (
+      let i = Math.max(1, page - delta);
+      i <= Math.min(totalPages, page + delta);
+      i++
+    ) {
+      range.push(i);
+    }
+    return range;
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -38,18 +97,87 @@ export default function MessageLogPage() {
         <span className="text-sm text-gray-500">{total} {tc('results')}</span>
       </div>
 
-      <div className="flex gap-2 mb-4">
-        <select value={filter.isIncoming} onChange={e => setFilter(f => ({...f, isIncoming: e.target.value}))} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          <option value="">{t('all')}</option>
-          <option value="true">{t('incoming')}</option>
-          <option value="false">{t('outgoing')}</option>
-        </select>
-        <select value={filter.status} onChange={e => setFilter(f => ({...f, status: e.target.value}))} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          <option value="">{tc('status')}: {t('all')}</option>
-          {['sent','delivered','read','failed','received'].map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+      {/* Filter Card */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-4 p-4 space-y-3">
+        {/* Row 1: Direction + Status + Search */}
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">{t('direction')}</label>
+            <select
+              value={directionInput}
+              onChange={e => setDirectionInput(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">{t('all')}</option>
+              <option value="true">{t('incoming')}</option>
+              <option value="false">{t('outgoing')}</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">{tc('status')}</label>
+            <select
+              value={statusInput}
+              onChange={e => setStatusInput(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">{t('all')}</option>
+              {['sent', 'delivered', 'read', 'failed', 'received'].map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 min-w-[180px]">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Contact name / phone</label>
+            <input
+              type="text"
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              placeholder="Search contact..."
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+        </div>
+
+        {/* Row 2: Date range + Apply/Clear buttons */}
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+            <input
+              type="date"
+              value={startDateInput}
+              onChange={e => setStartDateInput(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
+            <input
+              type="date"
+              value={endDateInput}
+              onChange={e => setEndDateInput(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleApply}
+              className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+            >
+              Apply
+            </button>
+            <button
+              type="button"
+              onClick={handleClear}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
       </div>
 
+      {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
@@ -63,27 +191,107 @@ export default function MessageLogPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {loading && <tr><td colSpan={6} className="text-center py-8 text-gray-400">{tc('loading')}</td></tr>}
-            {!loading && logs.length === 0 && <tr><td colSpan={6} className="text-center py-8 text-gray-400">{tc('noData')}</td></tr>}
+            {loading && (
+              <tr><td colSpan={6} className="text-center py-8 text-gray-400">{tc('loading')}</td></tr>
+            )}
+            {!loading && logs.length === 0 && (
+              <tr><td colSpan={6} className="text-center py-8 text-gray-400">{tc('noData')}</td></tr>
+            )}
             {logs.map((log) => (
               <tr key={log.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-gray-700">{log.contact?.firstName} {log.contact?.lastName} <span className="text-gray-400">({log.contact?.waId})</span></td>
-                <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{log.messageContent ?? `[${log.messageType}]`}</td>
+                <td className="px-4 py-3 text-gray-700">
+                  {log.contact?.firstName} {log.contact?.lastName}{' '}
+                  <span className="text-gray-400">({log.contact?.waId})</span>
+                </td>
+                <td className="px-4 py-3 text-gray-600 max-w-xs truncate">
+                  {log.messageContent ?? `[${log.messageType}]`}
+                </td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{log.messageType}</td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${log.isIncomingMessage ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    log.isIncomingMessage ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'
+                  }`}>
                     {log.isIncomingMessage ? '↓ ' + t('incoming') : '↑ ' + t('outgoing')}
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor[log.status] ?? 'bg-gray-100 text-gray-600'}`}>{log.status}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor[log.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {log.status}
+                  </span>
                 </td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{new Date(log.createdAt).toLocaleString()}</td>
+                <td className="px-4 py-3 text-gray-500 text-xs">
+                  {new Date(log.createdAt).toLocaleString()}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-1 mt-4 flex-wrap">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-1.5 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50"
+          >
+            {tc('previous')}
+          </button>
+
+          {/* First page + ellipsis */}
+          {getPageNumbers()[0] > 1 && (
+            <>
+              <button
+                onClick={() => setPage(1)}
+                className="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50"
+              >
+                1
+              </button>
+              {getPageNumbers()[0] > 2 && (
+                <span className="px-2 py-1.5 text-gray-400 text-sm">...</span>
+              )}
+            </>
+          )}
+
+          {getPageNumbers().map(n => (
+            <button
+              key={n}
+              onClick={() => setPage(n)}
+              className={`px-3 py-1.5 border rounded text-sm ${
+                n === page
+                  ? 'bg-green-500 border-green-500 text-white'
+                  : 'border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+
+          {/* Last page + ellipsis */}
+          {getPageNumbers()[getPageNumbers().length - 1] < totalPages && (
+            <>
+              {getPageNumbers()[getPageNumbers().length - 1] < totalPages - 1 && (
+                <span className="px-2 py-1.5 text-gray-400 text-sm">...</span>
+              )}
+              <button
+                onClick={() => setPage(totalPages)}
+                className="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50"
+              >
+                {totalPages}
+              </button>
+            </>
+          )}
+
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            className="px-3 py-1.5 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50"
+          >
+            {tc('next')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { USER_ROLES, type VendorPermission } from '@/lib/constants';
 export type DashboardNavItem = {
   key: string;
   href: string;
-  icon: 'layout' | 'users' | 'message-circle' | 'megaphone' | 'file-text' | 'bot' | 'history' | 'shield' | 'gem' | 'settings';
+  icon: 'layout' | 'users' | 'message-circle' | 'megaphone' | 'file-text' | 'bot' | 'history' | 'shield' | 'gem' | 'settings' | 'smartphone';
   requiredPermission?: VendorPermission;
   ownerOnly?: boolean;
   superAdminOnly?: boolean;
@@ -19,6 +19,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
   { key: 'messageLog', href: '/message-log', icon: 'history', requiredPermission: 'view_message_log' },
   { key: 'users', href: '/users', icon: 'shield', requiredPermission: 'manage_users' },
   { key: 'subscription', href: '/subscription', icon: 'gem', ownerOnly: true },
+  { key: 'whatsappSettings', href: '/settings/whatsapp', icon: 'smartphone', ownerOnly: true },
   { key: 'settings', href: '/settings', icon: 'settings', ownerOnly: true },
   { key: 'adminPanel', href: '/admin', icon: 'shield', superAdminOnly: true },
 ];

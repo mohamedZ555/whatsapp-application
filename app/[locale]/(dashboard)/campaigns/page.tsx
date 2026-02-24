@@ -10,14 +10,34 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => {
+  function fetchCampaigns() {
     setLoading(true);
     fetch(`/api/campaigns${filter ? `?status=${filter}` : ''}`)
       .then(r => r.json())
-      .then(d => { setCampaigns(d); setLoading(false); })
+      .then(d => { setCampaigns(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    fetchCampaigns();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
+
+  async function handleDelete(id: string) {
+    if (!window.confirm(tc('confirmDelete'))) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/campaigns?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        fetchCampaigns();
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   const statusLabel: Record<number, { label: string; color: string }> = {
     1: { label: t('upcoming'), color: 'bg-blue-50 text-blue-700' },
@@ -64,6 +84,7 @@ export default function CampaignsPage() {
             {!loading && campaigns.length === 0 && <tr><td colSpan={5} className="text-center py-8 text-gray-400">{tc('noData')}</td></tr>}
             {campaigns.map((c) => {
               const status = statusLabel[c.status] ?? { label: String(c.status), color: 'bg-gray-100 text-gray-600' };
+              const canDelete = c.status !== 2; // Cannot delete while processing
               return (
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{c.name}</td>
@@ -71,7 +92,20 @@ export default function CampaignsPage() {
                   <td className="px-4 py-3 text-gray-600">{c.scheduledAt ? new Date(c.scheduledAt).toLocaleString() : '—'}</td>
                   <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span></td>
                   <td className="px-4 py-3">
-                    <Link href={`/campaigns/${c.id}`} className="text-blue-600 hover:underline text-xs">{tc('view')}</Link>
+                    <div className="flex items-center gap-2">
+                      <Link href={`/campaigns/${c.id}`} className="text-blue-600 hover:underline text-xs">
+                        {tc('view')}
+                      </Link>
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDelete(c.id)}
+                          disabled={deletingId === c.id}
+                          className="text-xs text-red-600 hover:text-red-800 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {deletingId === c.id ? '...' : tc('delete')}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

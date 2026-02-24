@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status');
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
+  const search = searchParams.get('search')?.trim();
 
   const where: Prisma.WhatsappMessageLogWhereInput = vendorId ? { vendorId } : {};
   if (isIncoming !== null && isIncoming !== '') where.isIncomingMessage = isIncoming === 'true';
@@ -30,6 +31,16 @@ export async function GET(req: NextRequest) {
     where.createdAt = {};
     if (startDate) where.createdAt.gte = new Date(startDate);
     if (endDate) where.createdAt.lte = new Date(endDate);
+  }
+
+  if (search) {
+    where.contact = {
+      OR: [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { waId: { contains: search } },
+      ],
+    };
   }
 
   const [data, total] = await Promise.all([

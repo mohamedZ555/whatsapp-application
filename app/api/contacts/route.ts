@@ -25,8 +25,12 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get('search') ?? '';
   const groupId = searchParams.get('groupId');
   const selectedVendorId = searchParams.get('vendorId') ?? undefined;
+  const statusParam = searchParams.get('status');
+  const assignedFilter = searchParams.get('assigned');
+  const orderByParam = searchParams.get('orderBy');
 
   const where: Prisma.ContactWhereInput = { ...getContactScope(actor, selectedVendorId), status: { not: 5 } };
+
   if (search) {
     where.OR = [
       { firstName: { contains: search, mode: 'insensitive' } },
@@ -39,12 +43,32 @@ export async function GET(req: NextRequest) {
     where.groups = { some: { contactGroupId: groupId } };
   }
 
+  // Status filter
+  if (statusParam === '1' || statusParam === '2') {
+    where.status = parseInt(statusParam);
+  }
+
+  // Assigned filter
+  if (assignedFilter === 'me') {
+    where.assignedUserId = actor.userId;
+  } else if (assignedFilter === 'none') {
+    where.assignedUserId = null;
+  }
+
+  // Order by
+  let orderBy: Prisma.ContactOrderByWithRelationInput = { createdAt: 'desc' };
+  if (orderByParam === 'messaged') {
+    orderBy = { messagedAt: { sort: 'desc', nulls: 'last' } };
+  } else if (orderByParam === 'name') {
+    orderBy = { firstName: 'asc' };
+  }
+
   const [data, total] = await Promise.all([
     prisma.contact.findMany({
       where,
       skip: (page - 1) * limit,
       take: limit,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       include: {
         groups: { include: { contactGroup: { select: { id: true, name: true, color: true } } } },
         labels: { include: { label: { select: { id: true, name: true, color: true } } } },

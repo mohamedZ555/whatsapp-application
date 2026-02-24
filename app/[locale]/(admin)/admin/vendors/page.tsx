@@ -1,6 +1,8 @@
 import prisma from '@/lib/prisma';
 import { Link } from '@/i18n/navigation';
 import { getTranslations } from 'next-intl/server';
+import { VendorActionsWrapper } from './actions-wrapper';
+import { CreateVendorButton } from './create-vendor-button';
 
 const PAGE_LIMITS = [10, 25, 50, 100] as const;
 
@@ -69,12 +71,7 @@ export default async function AdminVendorsPage({
     <div className="space-y-3">
       <div className="flex items-center justify-between px-1">
         <h1 className="text-[40px] font-normal leading-none tracking-tight text-emerald-950">{tAdmin('vendors')}</h1>
-        <Link
-          href="/dashboard/users"
-          className="rounded-md border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
-        >
-          {tAdmin('addNewVendor')}
-        </Link>
+        <CreateVendorButton />
       </div>
 
       <section className="rounded-md border border-emerald-100 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
@@ -121,7 +118,6 @@ export default async function AdminVendorsPage({
             <thead>
               <tr className="border-b border-emerald-100 bg-emerald-50/50 text-[11px] uppercase tracking-[0.12em] text-slate-600">
                 <th className="px-3 py-2 text-start font-semibold">{tAdmin('vendorTitle')}</th>
-                <th className="px-3 py-2 text-start font-semibold">{tAdmin('quickActions')}</th>
                 <th className="px-3 py-2 text-start font-semibold">{tAdmin('adminUserName')}</th>
                 <th className="px-3 py-2 text-start font-semibold">{tAdmin('username')}</th>
                 <th className="px-3 py-2 text-start font-semibold">{tAdmin('email')}</th>
@@ -129,13 +125,14 @@ export default async function AdminVendorsPage({
                 <th className="px-3 py-2 text-start font-semibold">{tAdmin('mobileNumber')}</th>
                 <th className="px-3 py-2 text-start font-semibold">{tAdmin('adminUserStatus')}</th>
                 <th className="px-3 py-2 text-start font-semibold">{tCommon('createdAt')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tAdmin('quickActions')}</th>
                 <th className="px-3 py-2 text-start font-semibold">{tCommon('actions')}</th>
               </tr>
             </thead>
             <tbody>
               {vendors.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-3 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={10} className="px-3 py-8 text-center text-sm text-slate-500" >
                     {tCommon('noData')}
                   </td>
                 </tr>
@@ -156,14 +153,6 @@ export default async function AdminVendorsPage({
                 return (
                   <tr key={vendor.id} className="border-b border-emerald-50 bg-white hover:bg-emerald-50/30">
                     <td className="px-3 py-2 text-emerald-800">{vendor.title ?? vendor.slug ?? vendor.uid}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex flex-wrap gap-1.5">
-                        <button className="rounded bg-slate-500 px-2 py-1 text-[11px] font-semibold text-white">{tAdmin('loginAs')}</button>
-                        <button className="rounded bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white">
-                          {vendor.subscriptions[0]?.planId ?? tAdmin('subscriptions')}
-                        </button>
-                      </div>
-                    </td>
                     <td className="px-3 py-2">{adminName || tCommon('na')}</td>
                     <td className="px-3 py-2">{adminUser?.username ?? tCommon('na')}</td>
                     <td className="px-3 py-2">{adminUser?.email ?? tCommon('na')}</td>
@@ -179,13 +168,16 @@ export default async function AdminVendorsPage({
                       </span>
                     </td>
                     <td className="px-3 py-2">{createdOn}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex flex-wrap gap-1.5">
-                        <button className="rounded bg-emerald-700 px-2 py-1 text-[11px] font-semibold text-white">{tCommon('edit')}</button>
-                        <button className="rounded bg-rose-500 px-2 py-1 text-[11px] font-semibold text-white">{tAdmin('softDelete')}</button>
-                        <button className="rounded bg-slate-700 px-2 py-1 text-[11px] font-semibold text-white">{tAdmin('changePassword')}</button>
-                      </div>
-                    </td>
+                    <VendorActionsWrapper
+                      vendor={{
+                        id: vendor.id,
+                        title: vendor.title,
+                        slug: vendor.slug,
+                        uid: vendor.uid,
+                        status: vendor.status,
+                      }}
+                      subscriptionPlanId={vendor.subscriptions[0]?.planId ?? null}
+                    />
                   </tr>
                 );
               })}

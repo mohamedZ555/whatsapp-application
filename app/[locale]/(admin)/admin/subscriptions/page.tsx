@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { getTranslations } from 'next-intl/server';
+import { AdminSubscriptionActions } from './actions';
 
 export default async function AdminSubscriptionsPage() {
   const tAdmin = await getTranslations('admin');
@@ -22,6 +23,7 @@ export default async function AdminSubscriptionsPage() {
               <th className="text-start px-4 py-3 font-medium text-slate-600">{tCommon('status')}</th>
               <th className="text-start px-4 py-3 font-medium text-slate-600">{tAdmin('startsAt')}</th>
               <th className="text-start px-4 py-3 font-medium text-slate-600">{tAdmin('endsAt')}</th>
+              <th className="text-start px-4 py-3 font-medium text-slate-600">{tCommon('actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-emerald-50">
@@ -32,6 +34,13 @@ export default async function AdminSubscriptionsPage() {
                 <td className="px-4 py-3 text-slate-600">{sub.status}</td>
                 <td className="px-4 py-3 text-slate-500">{sub.startsAt ? new Date(sub.startsAt).toLocaleDateString() : tCommon('na')}</td>
                 <td className="px-4 py-3 text-slate-500">{sub.endsAt ? new Date(sub.endsAt).toLocaleDateString() : tCommon('na')}</td>
+                <td className="px-4 py-3">
+                  <AdminSubscriptionActions
+                    vendorId={sub.vendorId}
+                    vendorTitle={sub.vendor.title ?? sub.vendor.slug ?? sub.vendor.uid}
+                    currentPlanId={sub.planId}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>

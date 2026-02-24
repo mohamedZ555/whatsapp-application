@@ -6,6 +6,9 @@ import { useRouter } from '@/i18n/navigation';
 import { cn, getInitials } from '@/lib/utils';
 import { useSession } from 'next-auth/react';
 import { USER_ROLES } from '@/lib/constants';
+import { getPusherClient, PUSHER_EVENTS } from '@/lib/pusher';
+
+type ChatFilter = 'all' | 'unread' | 'mine' | 'unassigned';
 
 export default function ChatPage({ params }: { params: Promise<{ contactId?: string[] }> }) {
   const { contactId } = use(params);
@@ -16,6 +19,7 @@ export default function ChatPage({ params }: { params: Promise<{ contactId?: str
   const { data: session } = useSession();
   const roleId = (session?.user as any)?.roleId as number | undefined;
   const canAssign = roleId === USER_ROLES.SUPER_ADMIN || roleId === USER_ROLES.VENDOR;
+  const vendorUid = (session?.user as any)?.vendorUid as string | undefined;
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
@@ -24,16 +28,25 @@ export default function ChatPage({ params }: { params: Promise<{ contactId?: str
   const [assigning, setAssigning] = useState(false);
   const [text, setText] = useState('');
   const [search, setSearch] = useState('');
+  const [chatFilter, setChatFilter] = useState<ChatFilter>('all');
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch sidebar contacts
-  useEffect(() => {
-    fetch(`/api/chat/contacts?search=${encodeURIComponent(search)}`)
+  function refreshContacts() {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (chatFilter !== 'all') params.set('chatFilter', chatFilter);
+    fetch(`/api/chat/contacts?${params.toString()}`)
       .then((r) => r.json())
       .then(setContacts)
       .catch(() => {});
-  }, [search]);
+  }
+
+  // Fetch sidebar contacts
+  useEffect(() => {
+    refreshContacts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, chatFilter]);
 
   // Fetch messages when contact selected
   useEffect(() => {
@@ -43,8 +56,11 @@ export default function ChatPage({ params }: { params: Promise<{ contactId?: str
       .then((d) => {
         setMessages(d.messages ?? []);
         setActiveContact(d.contact ?? null);
+        // Refresh contacts sidebar to clear unread count after opening conversation
+        refreshContacts();
       })
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContactId]);
 
   useEffect(() => {
@@ -60,6 +76,47 @@ export default function ChatPage({ params }: { params: Promise<{ contactId?: str
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Pusher real-time subscription
+  useEffect(() => {
+    if (!vendorUid) return;
+
+    const pusher = getPusherClient();
+    const channelName = `private-vendor-${vendorUid}`;
+    const channel = pusher.subscribe(channelName);
+
+    channel.bind(PUSHER_EVENTS.NEW_MESSAGE, (data: any) => {
+      if (data.log?.contactId === selectedContactId) {
+        setMessages((prev) => {
+          const alreadyExists = prev.some((m) => m.id === data.log.id);
+          if (alreadyExists) return prev;
+          return [...prev, data.log];
+        });
+      }
+      // Always refresh sidebar to update unread counts / last message preview
+      refreshContacts();
+    });
+
+    channel.bind(PUSHER_EVENTS.MESSAGE_STATUS, (data: any) => {
+      if (data.waMessageId && data.status) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.waMessageId === data.waMessageId ? { ...m, status: data.status } : m
+          )
+        );
+      }
+    });
+
+    channel.bind(PUSHER_EVENTS.CONTACT_UPDATE, () => {
+      refreshContacts();
+    });
+
+    return () => {
+      channel.unbind_all();
+      pusher.unsubscribe(channelName);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendorUid, selectedContactId]);
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
@@ -89,14 +146,29 @@ export default function ChatPage({ params }: { params: Promise<{ contactId?: str
     setAssigning(false);
     const refreshed = await fetch(`/api/chat/messages/${activeContact.id}`).then((r) => r.json());
     setActiveContact(refreshed.contact ?? null);
-    fetch(`/api/chat/contacts?search=${encodeURIComponent(search)}`)
-      .then((r) => r.json())
-      .then(setContacts)
-      .catch(() => {});
+    refreshContacts();
   }
 
   const contactName = (c: any) =>
     [c.firstName, c.lastName].filter(Boolean).join(' ') || c.waId;
+
+  function renderMessageStatus(msg: any) {
+    if (msg.isIncomingMessage) return null;
+    if (msg.status === 'read') {
+      return <span className="ms-1 text-blue-300">✓✓</span>;
+    }
+    if (msg.status === 'delivered') {
+      return <span className="ms-1 text-green-200">✓✓</span>;
+    }
+    return <span className="ms-1 text-green-200">✓</span>;
+  }
+
+  const filterLabels: { key: ChatFilter; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'unread', label: 'Unread' },
+    { key: 'mine', label: 'Mine' },
+    { key: 'unassigned', label: 'Unassigned' },
+  ];
 
   return (
     <div className="flex h-full -m-6 overflow-hidden">
@@ -104,6 +176,29 @@ export default function ChatPage({ params }: { params: Promise<{ contactId?: str
       <div className="w-72 bg-white border-e border-gray-200 flex flex-col flex-shrink-0">
         <div className="p-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900 mb-3">{t('recentChats')}</h2>
+
+          {/* Filter pills */}
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {filterLabels.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setChatFilter(key)}
+                className={
+                  chatFilter === key
+                    ? 'bg-green-500 text-white text-xs rounded-full px-3 py-1'
+                    : 'text-xs rounded-full px-3 py-1 text-gray-600 hover:bg-gray-100 border border-gray-200'
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Contact count */}
+          <p className="text-xs text-gray-400 mb-2">
+            {contacts.length} conversation{contacts.length !== 1 ? 's' : ''}
+          </p>
+
           <input
             type="text"
             placeholder={tc('search') + '...'}
@@ -206,11 +301,7 @@ export default function ChatPage({ params }: { params: Promise<{ contactId?: str
                     </p>
                     <p className={cn('text-xs mt-1', msg.isIncomingMessage ? 'text-gray-400' : 'text-green-100')}>
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      {!msg.isIncomingMessage && (
-                        <span className="ms-1">
-                          {msg.status === 'read' ? '✓✓' : msg.status === 'delivered' ? '✓✓' : '✓'}
-                        </span>
-                      )}
+                      {renderMessageStatus(msg)}
                     </p>
                   </div>
                 </div>
