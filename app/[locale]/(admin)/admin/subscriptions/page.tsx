@@ -1,51 +1,384 @@
-import prisma from '@/lib/prisma';
-import { getTranslations } from 'next-intl/server';
-import { AdminSubscriptionActions } from './actions';
+'use client';
 
-export default async function AdminSubscriptionsPage() {
-  const tAdmin = await getTranslations('admin');
-  const tCommon = await getTranslations('common');
-  const subscriptions = await prisma.subscription.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: { vendor: true },
-    take: 100,
-  });
+import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { PLANS } from '@/lib/constants';
+
+const PLAN_OPTIONS = Object.values(PLANS).map((p) => ({ id: p.id, label: p.title }));
+const PAGE_LIMITS = [10, 25, 50, 100] as const;
+
+type Sub = {
+  id: string;
+  planId: string;
+  status: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  createdAt: string;
+  vendor: { id: string; title: string | null; slug: string | null; uid: string };
+};
+
+function billingCycleLabel(sub: Sub) {
+  if (!sub.startsAt || !sub.endsAt) return '—';
+  const days = (new Date(sub.endsAt).getTime() - new Date(sub.startsAt).getTime()) / (1000 * 60 * 60 * 24);
+  return days >= 300 ? 'Yearly' : 'Monthly';
+}
+
+function statusBadge(status: string) {
+  const map: Record<string, string> = {
+    active: 'bg-emerald-100 text-emerald-700',
+    expired: 'bg-gray-100 text-gray-500',
+    cancelled: 'bg-rose-100 text-rose-600',
+    pending: 'bg-amber-100 text-amber-700',
+  };
+  return map[status] ?? 'bg-gray-100 text-gray-500';
+}
+
+function planLabel(id: string) {
+  return PLANS[id as keyof typeof PLANS]?.title ?? id;
+}
+
+function AddSubscriptionModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [vendors, setVendors] = useState<Array<{ id: string; title: string | null; uid: string }>>([]);
+  const [vendorId, setVendorId] = useState('');
+  const [planId, setPlanId] = useState('free');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch('/api/admin/vendors?limit=100')
+      .then((r) => r.json())
+      .then((d) => {
+        setVendors(d.vendors ?? []);
+        if (d.vendors?.length) setVendorId(d.vendors[0].id);
+      });
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/subscriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendorId, planId, billingCycle }),
+      });
+      const data = await res.json();
+      if (data.success) { onCreated(); onClose(); }
+      else setError(data.error ?? 'Error');
+    } catch { setError('Error'); }
+    finally { setLoading(false); }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Add Subscription</h2>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
+            <select value={vendorId} onChange={(e) => setVendorId(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" required>
+              {vendors.map((v) => (
+                <option key={v.id} value={v.id}>{v.title ?? v.uid}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
+            <select value={planId} onChange={(e) => setPlanId(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              {PLAN_OPTIONS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Billing Cycle</label>
+            <select value={billingCycle} onChange={(e) => setBillingCycle(e.target.value as 'monthly' | 'yearly')}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </div>
+          {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>}
+          <div className="flex gap-2 pt-2">
+            <button type="submit" disabled={loading}
+              className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">
+              {loading ? 'Creating...' : 'Create'}
+            </button>
+            <button type="button" onClick={onClose}
+              className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function EditModal({ sub, onClose, onSaved }: { sub: Sub; onClose: () => void; onSaved: () => void }) {
+  const [planId, setPlanId] = useState(sub.planId);
+  const [status, setStatus] = useState(sub.status);
+  const [startsAt, setStartsAt] = useState(sub.startsAt ? sub.startsAt.slice(0, 10) : '');
+  const [endsAt, setEndsAt] = useState(sub.endsAt ? sub.endsAt.slice(0, 10) : '');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/subscriptions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: sub.id, planId, status, startsAt: startsAt || null, endsAt: endsAt || null }),
+      });
+      const data = await res.json();
+      if (data.success) { onSaved(); onClose(); }
+      else setError(data.error ?? 'Error');
+    } catch { setError('Error'); }
+    finally { setLoading(false); }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Edit Subscription</h2>
+        <p className="text-sm text-gray-500 mb-4">{sub.vendor.title ?? sub.vendor.uid}</p>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
+            <select value={planId} onChange={(e) => setPlanId(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              {PLAN_OPTIONS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              {['active', 'expired', 'cancelled', 'pending'].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Starts At</label>
+              <input type="date" value={startsAt} onChange={(e) => setStartsAt(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ends At</label>
+              <input type="date" value={endsAt} onChange={(e) => setEndsAt(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>}
+          <div className="flex gap-2 pt-2">
+            <button type="submit" disabled={loading}
+              className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">
+              {loading ? 'Saving...' : 'Save'}
+            </button>
+            <button type="button" onClick={onClose}
+              className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+export default function AdminSubscriptionsPage() {
+  const [subscriptions, setSubscriptions] = useState<Sub[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editSub, setEditSub] = useState<Sub | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(page), limit: String(limit), search });
+      const res = await fetch(`/api/admin/subscriptions?${params}`);
+      const data = await res.json();
+      setSubscriptions(data.subscriptions ?? []);
+      setTotal(data.total ?? 0);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, [page, limit, search]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  async function handleDelete(id: string) {
+    if (!confirm('Delete this subscription? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/admin/subscriptions?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) fetchData();
+      else alert(data.error ?? 'Error');
+    } catch { alert('Error'); }
+  }
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setPage(1);
+    setSearch(searchInput);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const start = total === 0 ? 0 : (page - 1) * limit + 1;
+  const end = Math.min(total, page * limit);
 
   return (
-    <div className="space-y-5">
-      <h1 className="text-3xl font-bold text-emerald-950">{tAdmin('subscriptions')}</h1>
-      <div className="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-emerald-50/60 border-b border-emerald-100">
-            <tr>
-              <th className="text-start px-4 py-3 font-medium text-slate-600">{tAdmin('vendors')}</th>
-              <th className="text-start px-4 py-3 font-medium text-slate-600">{tAdmin('plan')}</th>
-              <th className="text-start px-4 py-3 font-medium text-slate-600">{tCommon('status')}</th>
-              <th className="text-start px-4 py-3 font-medium text-slate-600">{tAdmin('startsAt')}</th>
-              <th className="text-start px-4 py-3 font-medium text-slate-600">{tAdmin('endsAt')}</th>
-              <th className="text-start px-4 py-3 font-medium text-slate-600">{tCommon('actions')}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-emerald-50">
-            {subscriptions.map((sub) => (
-              <tr key={sub.id} className="hover:bg-emerald-50/40">
-                <td className="px-4 py-3 font-medium text-slate-900">{sub.vendor.title ?? sub.vendor.slug ?? sub.vendor.uid}</td>
-                <td className="px-4 py-3 text-slate-600">{sub.planId}</td>
-                <td className="px-4 py-3 text-slate-600">{sub.status}</td>
-                <td className="px-4 py-3 text-slate-500">{sub.startsAt ? new Date(sub.startsAt).toLocaleDateString() : tCommon('na')}</td>
-                <td className="px-4 py-3 text-slate-500">{sub.endsAt ? new Date(sub.endsAt).toLocaleDateString() : tCommon('na')}</td>
-                <td className="px-4 py-3">
-                  <AdminSubscriptionActions
-                    vendorId={sub.vendorId}
-                    vendorTitle={sub.vendor.title ?? sub.vendor.slug ?? sub.vendor.uid}
-                    currentPlanId={sub.planId}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between px-1">
+        <h1 className="text-[40px] font-normal leading-none tracking-tight text-emerald-950">Subscriptions</h1>
+        <button
+          onClick={() => setShowAdd(true)}
+          className="rounded-md border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+        >
+          Add Subscription
+        </button>
       </div>
+
+      <section className="rounded-md border border-emerald-100 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 px-4 py-4">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <span>Show</span>
+            <select
+              value={limit}
+              onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+              className="rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
+            >
+              {PAGE_LIMITS.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <span>results</span>
+          </div>
+          <form onSubmit={handleSearch} className="flex items-center gap-2">
+            <span className="text-sm text-slate-600">Search vendor:</span>
+            <input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-[200px] rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
+              placeholder="Vendor name..."
+            />
+            <button type="submit"
+              className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+              Search
+            </button>
+            {search && (
+              <button type="button" onClick={() => { setSearchInput(''); setSearch(''); setPage(1); }}
+                className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50">
+                Clear
+              </button>
+            )}
+          </form>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto px-4 py-3">
+          <table className="min-w-[860px] w-full border-collapse text-[13px] text-slate-600">
+            <thead>
+              <tr className="border-b border-emerald-100 bg-emerald-50/50 text-[11px] uppercase tracking-[0.12em] text-slate-600">
+                <th className="px-3 py-2 text-start font-semibold">Vendor</th>
+                <th className="px-3 py-2 text-start font-semibold">Plan</th>
+                <th className="px-3 py-2 text-start font-semibold">Billing</th>
+                <th className="px-3 py-2 text-start font-semibold">Status</th>
+                <th className="px-3 py-2 text-start font-semibold">Starts</th>
+                <th className="px-3 py-2 text-start font-semibold">Ends</th>
+                <th className="px-3 py-2 text-start font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={7} className="px-3 py-8 text-center text-sm text-slate-400">Loading...</td>
+                </tr>
+              )}
+              {!loading && subscriptions.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-3 py-8 text-center text-sm text-slate-500">No subscriptions found.</td>
+                </tr>
+              )}
+              {!loading && subscriptions.map((sub) => (
+                <tr key={sub.id} className="border-b border-emerald-50 bg-white hover:bg-emerald-50/30">
+                  <td className="px-3 py-2 font-medium text-emerald-800">{sub.vendor.title ?? sub.vendor.slug ?? sub.vendor.uid}</td>
+                  <td className="px-3 py-2">{planLabel(sub.planId)}</td>
+                  <td className="px-3 py-2">{billingCycleLabel(sub)}</td>
+                  <td className="px-3 py-2">
+                    <span className={`inline-flex rounded px-2 py-0.5 text-[11px] font-semibold capitalize ${statusBadge(sub.status)}`}>
+                      {sub.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2">{sub.startsAt ? new Date(sub.startsAt).toLocaleDateString() : '—'}</td>
+                  <td className="px-3 py-2">{sub.endsAt ? new Date(sub.endsAt).toLocaleDateString() : '—'}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => setEditSub(sub)}
+                        className="rounded bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(sub.id)}
+                        className="rounded bg-rose-500 px-2 py-1 text-[11px] font-semibold text-white hover:bg-rose-600"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-emerald-100 px-4 py-3 text-sm text-slate-500">
+          <div>Showing {start} to {end} of {total} entries</div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className={`rounded border px-3 py-1.5 text-xs font-semibold ${page > 1 ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50' : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'}`}
+            >
+              Previous
+            </button>
+            <span className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white">{page}</span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className={`rounded border px-3 py-1.5 text-xs font-semibold ${page < totalPages ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50' : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'}`}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Modals */}
+      {mounted && showAdd && (
+        <AddSubscriptionModal onClose={() => setShowAdd(false)} onCreated={fetchData} />
+      )}
+      {mounted && editSub && (
+        <EditModal sub={editSub} onClose={() => setEditSub(null)} onSaved={fetchData} />
+      )}
     </div>
   );
 }

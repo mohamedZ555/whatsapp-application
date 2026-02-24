@@ -3,24 +3,14 @@
 import { useState } from 'react';
 import { PLANS } from '@/lib/constants';
 
-type TData = {
-  currentPlan: string;
-  perMonth: string;
-  upgradePlan: string;
-  unlimited: string;
-  contacts: string;
-  campaigns: string;
-  botReplies: string;
-  teamMembers: string;
-  no: string;
-};
-
 type Props = {
   currentPlanId: string;
-  tData: TData;
+  currentBillingCycle: 'monthly' | 'yearly' | null;
+  endsAt: string | null;
 };
 
-export function SubscriptionPlanCards({ currentPlanId, tData }: Props) {
+export function SubscriptionPlanCards({ currentPlanId, currentBillingCycle, endsAt }: Props) {
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(currentBillingCycle ?? 'monthly');
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -32,15 +22,14 @@ export function SubscriptionPlanCards({ currentPlanId, tData }: Props) {
       const res = await fetch('/api/subscription/upgrade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ planId, billingCycle }),
       });
       const data = await res.json();
       if (data.success) {
-        setFeedback({ type: 'success', message: `Successfully upgraded to ${PLANS[planId as keyof typeof PLANS]?.title ?? planId}!` });
-        // Reload to reflect new plan
-        setTimeout(() => window.location.reload(), 1500);
+        setFeedback({ type: 'success', message: `Plan changed to ${PLANS[planId as keyof typeof PLANS]?.title ?? planId}!` });
+        setTimeout(() => window.location.reload(), 1200);
       } else {
-        setFeedback({ type: 'error', message: data.error ?? 'Failed to upgrade plan.' });
+        setFeedback({ type: 'error', message: data.error ?? 'Failed to change plan.' });
       }
     } catch {
       setFeedback({ type: 'error', message: 'Network error. Please try again.' });
@@ -49,63 +38,92 @@ export function SubscriptionPlanCards({ currentPlanId, tData }: Props) {
     }
   }
 
-  const featureCount = (val: number, singular: string) =>
-    val === -1 ? `${tData.unlimited} ${singular}` : `${val} ${singular}`;
+  const featureVal = (val: number, singular: string) =>
+    val === -1 ? `Unlimited ${singular}` : `${val} ${singular}`;
 
   return (
     <div>
+      {/* Billing cycle toggle */}
+      <div className="flex items-center justify-center mb-6">
+        <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 gap-1">
+          <button
+            onClick={() => setBillingCycle('monthly')}
+            className={`px-5 py-2 rounded-md text-sm font-medium transition-colors ${billingCycle === 'monthly' ? 'bg-white shadow-sm text-emerald-700 border border-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setBillingCycle('yearly')}
+            className={`px-5 py-2 rounded-md text-sm font-medium transition-colors ${billingCycle === 'yearly' ? 'bg-white shadow-sm text-emerald-700 border border-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Yearly
+            <span className="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Save ~17%</span>
+          </button>
+        </div>
+      </div>
+
       {feedback && (
-        <div
-          className={`mb-4 rounded-lg px-4 py-3 text-sm font-medium ${
-            feedback.type === 'success'
-              ? 'bg-green-50 border border-green-200 text-green-700'
-              : 'bg-red-50 border border-red-200 text-red-700'
-          }`}
-        >
+        <div className={`mb-4 rounded-lg px-4 py-3 text-sm font-medium ${feedback.type === 'success' ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
           {feedback.message}
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {Object.values(PLANS).map((plan) => (
-          <div
-            key={plan.id}
-            className={`bg-white rounded-xl border p-6 shadow-sm ${
-              plan.id === currentPlanId ? 'border-green-400 ring-2 ring-green-100' : 'border-gray-100'
-            }`}
-          >
-            <h3 className="font-bold text-gray-900 text-lg mb-1">{plan.title}</h3>
-            <p className="text-3xl font-bold text-gray-900 mb-1">
-              ${plan.pricing.monthly}
-              <span className="text-sm font-normal text-gray-500">{tData.perMonth}</span>
-            </p>
+        {Object.values(PLANS).map((plan) => {
+          const isCurrent = plan.id === currentPlanId;
+          const price = billingCycle === 'yearly' ? plan.pricing.yearly : plan.pricing.monthly;
+          const perLabel = billingCycle === 'yearly' ? '/ year' : '/ month';
 
-            {plan.id !== currentPlanId ? (
-              <button
-                onClick={() => handleUpgrade(plan.id)}
-                disabled={upgrading === plan.id}
-                className="w-full mt-4 px-4 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-              >
-                {upgrading === plan.id ? '...' : tData.upgradePlan}
-              </button>
-            ) : (
-              <div className="w-full mt-4 px-4 py-2 bg-green-50 text-green-700 rounded-lg text-sm text-center font-medium">
-                ✓ {tData.currentPlan}
+          return (
+            <div
+              key={plan.id}
+              className={`bg-white rounded-xl border p-6 shadow-sm flex flex-col ${isCurrent ? 'border-emerald-400 ring-2 ring-emerald-100' : 'border-gray-100'}`}
+            >
+              {isCurrent && (
+                <div className="mb-2 inline-flex self-start rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  Current Plan
+                </div>
+              )}
+              <h3 className="font-bold text-gray-900 text-lg mb-1">{plan.title}</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-0.5">
+                ${price}
+                <span className="text-sm font-normal text-gray-400 ml-1">{perLabel}</span>
+              </p>
+              {billingCycle === 'yearly' && plan.pricing.monthly > 0 && (
+                <p className="text-xs text-gray-400 mb-1 line-through">${plan.pricing.monthly * 12} / year</p>
+              )}
+
+              <ul className="mt-3 space-y-1.5 text-xs text-gray-500 flex-1">
+                <li>✓ {featureVal(plan.features.contacts, 'contacts')}</li>
+                <li>✓ {featureVal(plan.features.campaignsPerMonth, 'campaigns/mo')}</li>
+                <li>✓ {featureVal(plan.features.botReplies, 'bot replies')}</li>
+                <li>✓ {plan.features.teamMembers === 0 ? 'No team members' : featureVal(plan.features.teamMembers, 'team members')}</li>
+                <li>✓ {featureVal(plan.features.botFlows, 'bot flows')}</li>
+              </ul>
+
+              <div className="mt-4">
+                {isCurrent ? (
+                  <div className="w-full px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm text-center font-medium">
+                    ✓ Active
+                    {endsAt && (
+                      <div className="text-[10px] text-emerald-500 mt-0.5">
+                        Renews {new Date(endsAt).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleUpgrade(plan.id)}
+                    disabled={upgrading === plan.id}
+                    className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {upgrading === plan.id ? 'Upgrading...' : plan.pricing.monthly === 0 ? 'Switch to Free' : 'Upgrade'}
+                  </button>
+                )}
               </div>
-            )}
-
-            <ul className="mt-4 space-y-2 text-xs text-gray-600">
-              <li>👥 {featureCount(plan.features.contacts, tData.contacts)}</li>
-              <li>📢 {featureCount(plan.features.campaignsPerMonth, tData.campaigns)}</li>
-              <li>🤖 {featureCount(plan.features.botReplies, tData.botReplies)}</li>
-              <li>
-                👤 {plan.features.teamMembers === 0
-                  ? tData.no
-                  : featureCount(plan.features.teamMembers, tData.teamMembers)}
-              </li>
-            </ul>
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

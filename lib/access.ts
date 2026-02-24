@@ -19,7 +19,6 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
   { key: 'messageLog', href: '/message-log', icon: 'history', requiredPermission: 'view_message_log' },
   { key: 'users', href: '/users', icon: 'shield', requiredPermission: 'manage_users' },
   { key: 'subscription', href: '/subscription', icon: 'gem', ownerOnly: true },
-  { key: 'whatsappSettings', href: '/settings/whatsapp', icon: 'smartphone', ownerOnly: true },
   { key: 'settings', href: '/settings', icon: 'settings', ownerOnly: true },
   { key: 'adminPanel', href: '/admin', icon: 'shield', superAdminOnly: true },
 ];

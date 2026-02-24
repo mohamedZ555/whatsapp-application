@@ -183,17 +183,16 @@ export default function SettingsWhatsappPage() {
       {/* Navigation Tabs */}
       <div className="flex gap-1 border-b border-gray-200">
         <Link
-          href="/settings/general"
+          href="/settings"
           className="px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300 transition-colors"
         >
           {t('general')}
         </Link>
-        <Link
-          href="/settings/whatsapp"
+        <span
           className="px-4 py-2.5 text-sm font-medium text-emerald-600 border-b-2 border-emerald-600"
         >
           {t('whatsapp')}
-        </Link>
+        </span>
         <Link
           href="/settings/profile"
           className="px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300 transition-colors"
