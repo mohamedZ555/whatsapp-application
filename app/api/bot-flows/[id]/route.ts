@@ -47,6 +47,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       flowName: body.flowName ? String(body.flowName) : undefined,
       description: body.description !== undefined ? (body.description ? String(body.description) : null) : undefined,
       status: typeof body.status === 'number' ? body.status : undefined,
+      jobCategoryId: body.jobCategoryId !== undefined ? (body.jobCategoryId ? String(body.jobCategoryId) : null) : undefined,
       data: body.data !== undefined ? body.data : undefined,
     },
   });

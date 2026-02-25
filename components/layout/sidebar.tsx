@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Megaphone,
   MessageCircle,
+  Receipt,
   Settings,
   ShieldCheck,
   Smartphone,
@@ -29,6 +30,7 @@ const iconMap = {
   history: History,
   shield: ShieldCheck,
   gem: Gem,
+  receipt: Receipt,
   settings: Settings,
   smartphone: Smartphone,
 } as const;

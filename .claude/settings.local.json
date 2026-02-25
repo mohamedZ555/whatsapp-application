@@ -14,7 +14,13 @@
       "Bash(grep:*)",
       "Bash(grep impersonate:*)",
       "Bash(find:*)",
-      "Bash(cd D:/whatsapp-application && npx next build 2>&1)"
+      "Bash(cd D:/whatsapp-application && npx next build 2>&1)",
+      "Bash(cd /d/whatsapp-application && npx prisma migrate status 2>&1)",
+      "Bash(cd /d/whatsapp-application && npx prisma db execute --stdin <<'EOF' 2>&1\nSELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;\nEOF)",
+      "Bash(cd /d/whatsapp-application && npx tsc --noEmit 2>&1)",
+      "Bash(cd /d/whatsapp-application && taskkill /F /IM node.exe 2>&1; sleep 2 && npx prisma generate 2>&1)",
+      "Bash(cd /d/whatsapp-application && npx prisma validate 2>&1)",
+      "Bash(ls:*)"
     ]
   }
 }

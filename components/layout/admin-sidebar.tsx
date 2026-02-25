@@ -8,6 +8,7 @@ import {
   Gauge,
   Globe,
   LayoutList,
+  Receipt,
   Settings2,
   Users,
 } from "lucide-react";
@@ -21,6 +22,7 @@ type AdminNavItem = {
     | "dashboard"
     | "vendors"
     | "subscriptions"
+    | "transactions"
     | "translations"
     | "pages"
     | "configuration"
@@ -36,6 +38,12 @@ const navItems: AdminNavItem[] = [
     href: "/admin/subscriptions",
     labelKey: "subscriptions",
     icon: CreditCard,
+  },
+  {
+    key: "transactions",
+    href: "/admin/transactions",
+    labelKey: "transactions",
+    icon: Receipt,
   },
   {
     key: "configuration",

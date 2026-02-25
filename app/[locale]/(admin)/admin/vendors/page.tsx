@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma';
 import { Link } from '@/i18n/navigation';
 import { getTranslations } from 'next-intl/server';
+import { getServerPlans } from '@/lib/plans';
 import { VendorActionsWrapper } from './actions-wrapper';
 import { CreateVendorButton } from './create-vendor-button';
 
@@ -59,7 +60,7 @@ export default async function AdminVendorsPage({
     where.status = { in: [3] };
   }
 
-  const [vendors, total] = await Promise.all([
+  const [vendorsRaw, total, plans] = await Promise.all([
     prisma.vendor.findMany({
       where,
       skip: (page - 1) * limit,
@@ -80,10 +81,18 @@ export default async function AdminVendorsPage({
           },
         },
         subscriptions: { where: { status: 'active' }, take: 1, orderBy: { createdAt: 'desc' } },
+        _count: { select: { users: true, contacts: true, vendorUsers: true } },
       },
     }),
     prisma.vendor.count({ where }),
+    getServerPlans(),
   ]);
+
+  const vendors = vendorsRaw.map((v) => ({
+    ...v,
+    planId: v.subscriptions[0]?.planId ?? null,
+    planTitle: v.subscriptions[0]?.planId ? (plans[v.subscriptions[0].planId]?.title ?? v.subscriptions[0].planId) : 'Free',
+  }));
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const currentPage = Math.min(page, totalPages);
@@ -165,7 +174,7 @@ export default async function AdminVendorsPage({
         </div>
 
         <div className="overflow-x-auto px-4 py-3">
-          <table className="min-w-[1020px] w-full border-collapse text-[13px] text-slate-600">
+          <table className="min-w-[1140px] w-full border-collapse text-[13px] text-slate-600">
             <thead>
               <tr className="border-b border-emerald-100 bg-emerald-50/50 text-[11px] uppercase tracking-[0.12em] text-slate-600">
                 <th className="px-3 py-2 text-start font-semibold">{tAdmin('vendorTitle')}</th>
@@ -173,6 +182,7 @@ export default async function AdminVendorsPage({
                 <th className="px-3 py-2 text-start font-semibold">{tAdmin('username')}</th>
                 <th className="px-3 py-2 text-start font-semibold">{tAdmin('email')}</th>
                 <th className="px-3 py-2 text-start font-semibold">{tCommon('status')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tAdmin('plan')}</th>
                 <th className="px-3 py-2 text-start font-semibold">{tAdmin('mobileNumber')}</th>
                 <th className="px-3 py-2 text-start font-semibold">{tAdmin('adminUserStatus')}</th>
                 <th className="px-3 py-2 text-start font-semibold">{tCommon('createdAt')}</th>
@@ -183,7 +193,7 @@ export default async function AdminVendorsPage({
             <tbody>
               {vendors.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-3 py-8 text-center text-sm text-slate-500" >
+                  <td colSpan={11} className="px-3 py-8 text-center text-sm text-slate-500" >
                     {tCommon('noData')}
                   </td>
                 </tr>
@@ -209,6 +219,11 @@ export default async function AdminVendorsPage({
                     <td className="px-3 py-2">
                       {getVendorStatusBadge(vendor.status)}
                     </td>
+                    <td className="px-3 py-2">
+                      <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-blue-100 text-blue-700">
+                        {vendor.planTitle}
+                      </span>
+                    </td>
                     <td className="px-3 py-2">{adminUser?.mobileNumber ?? tCommon('na')}</td>
                     <td className="px-3 py-2">
                       {getAdminUserStatusBadge(adminUser?.status)}
@@ -223,7 +238,13 @@ export default async function AdminVendorsPage({
                         status: vendor.status,
                       }}
                       adminUserStatus={adminUserStatus}
-                      subscriptionPlanId={vendor.subscriptions[0]?.planId ?? null}
+                      subscriptionPlanId={vendor.planId}
+                      subscriptionPlanTitle={vendor.planTitle}
+                      vendorStats={{
+                        totalUsers: vendor._count.users,
+                        totalEmployees: vendor._count.vendorUsers,
+                        totalContacts: vendor._count.contacts,
+                      }}
                     />
                   </tr>
                 );

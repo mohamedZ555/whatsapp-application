@@ -19,32 +19,31 @@ model UserRole {
 }
 
 model User {
-  id              String    @id @default(cuid())
-  uid             String    @unique @default(cuid())
-  username        String    @unique
-  firstName       String
-  lastName        String
-  email           String    @unique
-  emailVerifiedAt DateTime?
-  password        String?
-  rememberToken   String?
-  status          Int       @default(1)
-  mobileNumber    String?
-  timezone        String    @default("UTC")
-  countryId       Int?
-  roleId          Int       @default(2)
-  vendorId        String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  role             UserRole       @relation(fields: [roleId], references: [id])
-  vendor           Vendor?        @relation(fields: [vendorId], references: [id])
-  country          Country?       @relation(fields: [countryId], references: [id])
-  vendorUserDetail VendorUser?
-  loginLogs        LoginLog[]
-  assignedContacts Contact[]      @relation("AssignedContacts")
+  id               String      @id @default(cuid())
+  uid              String      @unique @default(cuid())
+  username         String      @unique
+  firstName        String
+  lastName         String
+  email            String      @unique
+  emailVerifiedAt  DateTime?
+  password         String?
+  rememberToken    String?
+  status           Int         @default(1)
+  mobileNumber     String?
+  timezone         String      @default("UTC")
+  countryId        Int?
+  roleId           Int         @default(2)
+  vendorId         String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
   accounts         Account[]
+  assignedContacts Contact[]   @relation("AssignedContacts")
+  loginLogs        LoginLog[]
   sessions         Session[]
+  country          Country?    @relation(fields: [countryId], references: [id])
+  role             UserRole    @relation(fields: [roleId], references: [id])
+  vendor           Vendor?     @relation(fields: [vendorId], references: [id])
+  vendorUserDetail VendorUser?
 
   @@map("users")
 }
@@ -55,8 +54,7 @@ model LoginLog {
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 
   @@map("login_logs")
 }
@@ -67,15 +65,14 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@map("accounts")
@@ -86,8 +83,7 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
 }
@@ -102,85 +98,102 @@ model VerificationToken {
 }
 
 model Vendor {
-  id               String    @id @default(cuid())
-  uid              String    @unique @default(cuid())
-  title            String?
-  slug             String?   @unique
-  status           Int       @default(1)
-  stripeCustomerId String?
-  trialEndsAt      DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  users               User[]
-  vendorUsers         VendorUser[]
-  vendorSettings      VendorSetting[]
-  contacts            Contact[]
-  contactGroups       ContactGroup[]
-  labels              Label[]
-  contactCustomFields ContactCustomField[]
-  campaigns           Campaign[]
-  campaignGroups      CampaignGroup[]
-  botReplies          BotReply[]
+  id                  String                 @id @default(cuid())
+  uid                 String                 @unique @default(cuid())
+  title               String?
+  slug                String?                @unique
+  status              Int                    @default(1)
+  stripeCustomerId    String?
+  trialEndsAt         DateTime?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  activityLogs        ActivityLog[]
+  apiTokens           ApiToken[]
   botFlows            BotFlow[]
+  botReplies          BotReply[]
+  campaignGroups      CampaignGroup[]
+  campaigns           Campaign[]
+  contactCustomFields ContactCustomField[]
+  contactGroups       ContactGroup[]
+  contacts            Contact[]
+  jobCategories       EmployeeJobCategory[]
+  labels              Label[]
+  manualSubscriptions ManualSubscription[]
+  subscriptions       Subscription[]
+  transactions        Transaction[]
+  users               User[]
+  vendorSettings      VendorSetting[]
+  vendorUsers         VendorUser[]
   messageLogs         WhatsappMessageLog[]
   messageQueues       WhatsappMessageQueue[]
   templates           WhatsappTemplate[]
-  subscriptions       Subscription[]
-  manualSubscriptions ManualSubscription[]
-  activityLogs        ActivityLog[]
-  apiTokens           ApiToken[]
 
   @@map("vendors")
 }
 
 model VendorUser {
-  id          String   @id @default(cuid())
-  uid         String   @unique @default(cuid())
-  userId      String   @unique
-  vendorId    String
-  permissions Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user   User   @relation(fields: [userId], references: [id])
-  vendor Vendor @relation(fields: [vendorId], references: [id])
+  id            String               @id @default(cuid())
+  uid           String               @unique @default(cuid())
+  userId        String               @unique
+  vendorId      String
+  permissions   Json?
+  jobCategoryId String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  user          User                 @relation(fields: [userId], references: [id])
+  vendor        Vendor               @relation(fields: [vendorId], references: [id])
+  jobCategory   EmployeeJobCategory? @relation(fields: [jobCategoryId], references: [id])
 
   @@map("vendor_users")
+}
+
+model EmployeeJobCategory {
+  id          String       @id @default(cuid())
+  uid         String       @unique @default(cuid())
+  vendorId    String
+  name        String
+  description String?
+  color       String?      @default("#6c757d")
+  status      Int          @default(1)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  vendor      Vendor       @relation(fields: [vendorId], references: [id])
+  employees   VendorUser[]
+  botFlows    BotFlow[]
+
+  @@map("employee_job_categories")
 }
 
 model VendorSetting {
   id           String   @id @default(cuid())
   vendorId     String
   settingKey   String
-  settingValue String?  @db.Text
+  settingValue String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
-  vendor Vendor @relation(fields: [vendorId], references: [id])
+  vendor       Vendor   @relation(fields: [vendorId], references: [id])
 
   @@unique([vendorId, settingKey])
   @@map("vendor_settings")
 }
 
 model Country {
-  id           Int      @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   name         String
-  iso2         String   @unique
+  iso2         String    @unique
   iso3         String?
   phoneCode    String?
   currencyCode String?
-  createdAt    DateTime @default(now())
-
-  users    User[]
-  contacts Contact[]
+  createdAt    DateTime  @default(now())
+  contacts     Contact[]
+  users        User[]
 
   @@map("countries")
 }
 
 model Contact {
-  id                  String    @id @default(cuid())
-  uid                 String    @unique @default(cuid())
+  id                  String                    @id @default(cuid())
+  uid                 String                    @unique @default(cuid())
   vendorId            String
   firstName           String?
   lastName            String?
@@ -190,21 +203,20 @@ model Contact {
   countryId           Int?
   assignedUserId      String?
   messagedAt          DateTime?
-  unreadMessagesCount Int       @default(0)
-  disableAiBot        Boolean   @default(false)
+  unreadMessagesCount Int                       @default(0)
+  disableAiBot        Boolean                   @default(false)
   data                Json?
-  status              Int       @default(1)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  vendor           Vendor                       @relation(fields: [vendorId], references: [id])
-  country          Country?                     @relation(fields: [countryId], references: [id])
-  assignedUser     User?                        @relation("AssignedContacts", fields: [assignedUserId], references: [id])
-  groups           GroupContact[]
-  labels           ContactLabel[]
-  customFieldValues ContactCustomFieldValue[]
-  messageLogs      WhatsappMessageLog[]
-  messageQueues    WhatsappMessageQueue[]
+  status              Int                       @default(1)
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  customFieldValues   ContactCustomFieldValue[]
+  labels              ContactLabel[]
+  assignedUser        User?                     @relation("AssignedContacts", fields: [assignedUserId], references: [id])
+  country             Country?                  @relation(fields: [countryId], references: [id])
+  vendor              Vendor                    @relation(fields: [vendorId], references: [id])
+  groups              GroupContact[]
+  messageLogs         WhatsappMessageLog[]
+  messageQueues       WhatsappMessageQueue[]
 
   @@unique([vendorId, waId])
   @@index([vendorId, status])
@@ -213,47 +225,44 @@ model Contact {
 }
 
 model ContactGroup {
-  id          String   @id @default(cuid())
-  uid         String   @unique @default(cuid())
+  id          String         @id @default(cuid())
+  uid         String         @unique @default(cuid())
   vendorId    String
   name        String
   description String?
-  color       String?  @default("#6c757d")
-  status      Int      @default(1)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  vendor   Vendor         @relation(fields: [vendorId], references: [id])
-  contacts GroupContact[]
+  color       String?        @default("#6c757d")
+  status      Int            @default(1)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  vendor      Vendor         @relation(fields: [vendorId], references: [id])
+  contacts    GroupContact[]
 
   @@map("contact_groups")
 }
 
 model GroupContact {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   contactId      String
   contactGroupId String
-  createdAt      DateTime @default(now())
-
-  contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  contactGroup ContactGroup @relation(fields: [contactGroupId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  contactGroup   ContactGroup @relation(fields: [contactGroupId], references: [id], onDelete: Cascade)
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@unique([contactId, contactGroupId])
   @@map("group_contacts")
 }
 
 model Label {
-  id        String   @id @default(cuid())
-  uid       String   @unique @default(cuid())
+  id        String         @id @default(cuid())
+  uid       String         @unique @default(cuid())
   vendorId  String
   name      String
-  color     String?  @default("#6c757d")
-  status    Int      @default(1)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  vendor   Vendor         @relation(fields: [vendorId], references: [id])
-  contacts ContactLabel[]
+  color     String?        @default("#6c757d")
+  status    Int            @default(1)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  contacts  ContactLabel[]
+  vendor    Vendor         @relation(fields: [vendorId], references: [id])
 
   @@map("labels")
 }
@@ -263,63 +272,59 @@ model ContactLabel {
   contactId String
   labelId   String
   createdAt DateTime @default(now())
-
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  label   Label   @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  label     Label    @relation(fields: [labelId], references: [id], onDelete: Cascade)
 
   @@unique([contactId, labelId])
   @@map("contact_labels")
 }
 
 model ContactCustomField {
-  id          String   @id @default(cuid())
-  uid         String   @unique @default(cuid())
+  id          String                    @id @default(cuid())
+  uid         String                    @unique @default(cuid())
   vendorId    String
   fieldName   String
   fieldType   String
   fieldLabel  String
-  isRequired  Boolean  @default(false)
+  isRequired  Boolean                   @default(false)
   placeholder String?
-  status      Int      @default(1)
-  order       Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  vendor Vendor                     @relation(fields: [vendorId], references: [id])
-  values ContactCustomFieldValue[]
+  status      Int                       @default(1)
+  order       Int                       @default(0)
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  values      ContactCustomFieldValue[]
+  vendor      Vendor                    @relation(fields: [vendorId], references: [id])
 
   @@map("contact_custom_fields")
 }
 
 model ContactCustomFieldValue {
-  id            String   @id @default(cuid())
+  id            String             @id @default(cuid())
   contactId     String
   customFieldId String
-  fieldValue    String?  @db.Text
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  contact     Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  customField ContactCustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  fieldValue    String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  contact       Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  customField   ContactCustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
 
   @@unique([contactId, customFieldId])
   @@map("contact_custom_field_values")
 }
 
 model WhatsappTemplate {
-  id             String   @id @default(cuid())
-  uid            String   @unique @default(cuid())
+  id             String     @id @default(cuid())
+  uid            String     @unique @default(cuid())
   vendorId       String
   templateName   String
   templateStatus String
   languageCode   String
   category       String
   data           Json?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  vendor    Vendor     @relation(fields: [vendorId], references: [id])
-  campaigns Campaign[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  campaigns      Campaign[]
+  vendor         Vendor     @relation(fields: [vendorId], references: [id])
 
   @@map("whatsapp_templates")
 }
@@ -330,7 +335,7 @@ model WhatsappMessageLog {
   vendorId          String
   campaignId        String?
   contactId         String
-  messageContent    String?   @db.Text
+  messageContent    String?
   messageType       String
   status            String    @default("sent")
   isIncomingMessage Boolean   @default(false)
@@ -341,10 +346,9 @@ model WhatsappMessageLog {
   data              Json?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-
-  vendor   Vendor    @relation(fields: [vendorId], references: [id])
-  campaign Campaign? @relation(fields: [campaignId], references: [id])
-  contact  Contact   @relation(fields: [contactId], references: [id])
+  campaign          Campaign? @relation(fields: [campaignId], references: [id])
+  contact           Contact   @relation(fields: [contactId], references: [id])
+  vendor            Vendor    @relation(fields: [vendorId], references: [id])
 
   @@index([contactId, vendorId])
   @@index([campaignId])
@@ -359,7 +363,7 @@ model WhatsappMessageQueue {
   vendorId       String
   campaignId     String?
   contactId      String
-  messageContent String?   @db.Text
+  messageContent String?
   messageType    String
   status         Int       @default(1)
   scheduledAt    DateTime?
@@ -368,29 +372,27 @@ model WhatsappMessageQueue {
   data           Json?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
-
-  vendor   Vendor    @relation(fields: [vendorId], references: [id])
-  campaign Campaign? @relation(fields: [campaignId], references: [id])
-  contact  Contact   @relation(fields: [contactId], references: [id])
+  campaign       Campaign? @relation(fields: [campaignId], references: [id])
+  contact        Contact   @relation(fields: [contactId], references: [id])
+  vendor         Vendor    @relation(fields: [vendorId], references: [id])
 
   @@index([status, scheduledAt])
   @@map("whatsapp_message_queues")
 }
 
 model Campaign {
-  id          String    @id @default(cuid())
-  uid         String    @unique @default(cuid())
-  vendorId    String
-  name        String
-  templateId  String?
-  scheduledAt DateTime?
-  status      Int       @default(1)
-  data        Json?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  vendor        Vendor                 @relation(fields: [vendorId], references: [id])
+  id            String                 @id @default(cuid())
+  uid           String                 @unique @default(cuid())
+  vendorId      String
+  name          String
+  templateId    String?
+  scheduledAt   DateTime?
+  status        Int                    @default(1)
+  data          Json?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
   template      WhatsappTemplate?      @relation(fields: [templateId], references: [id])
+  vendor        Vendor                 @relation(fields: [vendorId], references: [id])
   messageLogs   WhatsappMessageLog[]
   messageQueues WhatsappMessageQueue[]
 
@@ -406,8 +408,7 @@ model CampaignGroup {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  vendor Vendor @relation(fields: [vendorId], references: [id])
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
 
   @@map("campaign_groups")
 }
@@ -419,34 +420,34 @@ model BotReply {
   botFlowId      String?
   replyName      String
   triggerType    String
-  triggerSubject String?  @db.Text
-  replyMessage   String?  @db.Text
+  triggerSubject String?
+  replyMessage   String?
   replyType      String   @default("text")
   status         Int      @default(1)
   order          Int      @default(0)
   data           Json?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-
-  vendor  Vendor   @relation(fields: [vendorId], references: [id])
-  botFlow BotFlow? @relation(fields: [botFlowId], references: [id])
+  botFlow        BotFlow? @relation(fields: [botFlowId], references: [id])
+  vendor         Vendor   @relation(fields: [vendorId], references: [id])
 
   @@map("bot_replies")
 }
 
 model BotFlow {
-  id          String   @id @default(cuid())
-  uid         String   @unique @default(cuid())
-  vendorId    String
-  flowName    String
-  description String?
-  status      Int      @default(1)
-  data        Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  vendor     Vendor     @relation(fields: [vendorId], references: [id])
-  botReplies BotReply[]
+  id            String               @id @default(cuid())
+  uid           String               @unique @default(cuid())
+  vendorId      String
+  jobCategoryId String?
+  flowName      String
+  description   String?
+  status        Int                  @default(1)
+  data          Json?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  vendor        Vendor               @relation(fields: [vendorId], references: [id])
+  jobCategory   EmployeeJobCategory? @relation(fields: [jobCategoryId], references: [id])
+  botReplies    BotReply[]
 
   @@map("bot_flows")
 }
@@ -464,8 +465,7 @@ model Subscription {
   status      String    @default("active")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-
-  vendor Vendor @relation(fields: [vendorId], references: [id])
+  vendor      Vendor    @relation(fields: [vendorId], references: [id])
 
   @@map("subscriptions")
 }
@@ -484,16 +484,36 @@ model ManualSubscription {
   data               Json?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
-
-  vendor Vendor @relation(fields: [vendorId], references: [id])
+  vendor             Vendor    @relation(fields: [vendorId], references: [id])
 
   @@map("manual_subscriptions")
+}
+
+model Transaction {
+  id                    String    @id @default(cuid())
+  uid                   String    @unique @default(cuid())
+  vendorId              String
+  type                  String    @default("subscription") // subscription | manual | refund | credit | debit
+  amount                Float
+  currency              String    @default("USD")
+  status                String    @default("pending") // pending | completed | failed | refunded
+  description           String?
+  stripePaymentIntentId String?
+  stripeInvoiceId       String?
+  planId                String?
+  billingCycle          String?
+  metadata              Json?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  vendor                Vendor    @relation(fields: [vendorId], references: [id])
+
+  @@map("transactions")
 }
 
 model Configuration {
   id          Int      @id @default(autoincrement())
   configKey   String   @unique
-  configValue String?  @db.Text
+  configValue String?
   dataType    Int      @default(1)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -506,7 +526,7 @@ model Page {
   uid        String   @unique @default(cuid())
   title      String
   slug       String   @unique
-  content    String?  @db.Text
+  content    String?
   type       Int      @default(1)
   showInMenu Boolean  @default(false)
   status     Int      @default(1)
@@ -527,8 +547,7 @@ model ActivityLog {
   ipAddress  String?
   userAgent  String?
   createdAt  DateTime @default(now())
-
-  vendor Vendor? @relation(fields: [vendorId], references: [id])
+  vendor     Vendor?  @relation(fields: [vendorId], references: [id])
 
   @@map("activity_logs")
 }
@@ -542,8 +561,7 @@ model ApiToken {
   status    Int       @default(1)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-
-  vendor Vendor @relation(fields: [vendorId], references: [id])
+  vendor    Vendor    @relation(fields: [vendorId], references: [id])
 
   @@map("api_tokens")
 }

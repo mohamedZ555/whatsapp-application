@@ -69,7 +69,11 @@ export async function GET(req: NextRequest) {
     include: {
       role: { select: { id: true, title: true } },
       vendor: { select: { id: true, title: true, uid: true } },
-      vendorUserDetail: true,
+      vendorUserDetail: {
+        include: {
+          jobCategory: { select: { id: true, name: true, color: true } },
+        },
+      },
     },
   });
 
@@ -166,11 +170,20 @@ export async function POST(req: NextRequest) {
   });
 
   if (parsedRoleId === USER_ROLES.VENDOR_USER && finalVendorId) {
+    const jobCategoryId = body.jobCategoryId ? String(body.jobCategoryId) : null;
+    // Validate job category belongs to this vendor
+    if (jobCategoryId) {
+      const cat = await prisma.employeeJobCategory.findFirst({
+        where: { id: jobCategoryId, vendorId: finalVendorId },
+      });
+      if (!cat) return NextResponse.json({ error: 'Invalid job category.' }, { status: 400 });
+    }
     await prisma.vendorUser.create({
       data: {
         vendorId: finalVendorId,
         userId: user.id,
         permissions: Array.isArray(permissions) ? permissions : [],
+        jobCategoryId,
       },
     });
   }
@@ -290,17 +303,26 @@ export async function PUT(req: NextRequest) {
   });
 
   const permissions = normalizePermissions(body?.permissions);
+  const jobCategoryIdRaw = body?.jobCategoryId;
+  const jobCategoryId =
+    jobCategoryIdRaw === null ? null :
+    typeof jobCategoryIdRaw === 'string' && jobCategoryIdRaw.trim()
+      ? jobCategoryIdRaw.trim()
+      : undefined;
+
   if (nextRoleId === USER_ROLES.VENDOR_USER && nextVendorId) {
     await prisma.vendorUser.upsert({
       where: { userId: target.id },
       update: {
         vendorId: nextVendorId,
         ...(permissions ? { permissions } : {}),
+        ...(jobCategoryId !== undefined ? { jobCategoryId } : {}),
       },
       create: {
         userId: target.id,
         vendorId: nextVendorId,
         permissions: permissions ?? [],
+        jobCategoryId: typeof jobCategoryId === 'string' ? jobCategoryId : null,
       },
     });
   } else {

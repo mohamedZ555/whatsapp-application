@@ -1,15 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { PLANS } from '@/lib/constants';
+import type { PlansMap } from '@/lib/plans';
 
 type Props = {
   currentPlanId: string;
   currentBillingCycle: 'monthly' | 'yearly' | null;
   endsAt: string | null;
+  plans: PlansMap;
 };
 
-export function SubscriptionPlanCards({ currentPlanId, currentBillingCycle, endsAt }: Props) {
+export function SubscriptionPlanCards({ currentPlanId, currentBillingCycle, endsAt, plans }: Props) {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(currentBillingCycle ?? 'monthly');
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -26,7 +27,7 @@ export function SubscriptionPlanCards({ currentPlanId, currentBillingCycle, ends
       });
       const data = await res.json();
       if (data.success) {
-        setFeedback({ type: 'success', message: `Plan changed to ${PLANS[planId as keyof typeof PLANS]?.title ?? planId}!` });
+        setFeedback({ type: 'success', message: `Plan changed to ${plans[planId]?.title ?? planId}!` });
         setTimeout(() => window.location.reload(), 1200);
       } else {
         setFeedback({ type: 'error', message: data.error ?? 'Failed to change plan.' });
@@ -39,7 +40,11 @@ export function SubscriptionPlanCards({ currentPlanId, currentBillingCycle, ends
   }
 
   const featureVal = (val: number, singular: string) =>
-    val === -1 ? `Unlimited ${singular}` : `${val} ${singular}`;
+    val === -1 ? `Unlimited ${singular}` : val === 0 ? `No ${singular}` : `${val} ${singular}`;
+
+  const sortedPlans = Object.values(plans).sort(
+    (a, b) => a.pricing.monthly - b.pricing.monthly
+  );
 
   return (
     <div>
@@ -48,28 +53,44 @@ export function SubscriptionPlanCards({ currentPlanId, currentBillingCycle, ends
         <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 gap-1">
           <button
             onClick={() => setBillingCycle('monthly')}
-            className={`px-5 py-2 rounded-md text-sm font-medium transition-colors ${billingCycle === 'monthly' ? 'bg-white shadow-sm text-emerald-700 border border-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`px-5 py-2 rounded-md text-sm font-medium transition-colors ${
+              billingCycle === 'monthly'
+                ? 'bg-white shadow-sm text-emerald-700 border border-gray-200'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
           >
             Monthly
           </button>
           <button
             onClick={() => setBillingCycle('yearly')}
-            className={`px-5 py-2 rounded-md text-sm font-medium transition-colors ${billingCycle === 'yearly' ? 'bg-white shadow-sm text-emerald-700 border border-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`px-5 py-2 rounded-md text-sm font-medium transition-colors ${
+              billingCycle === 'yearly'
+                ? 'bg-white shadow-sm text-emerald-700 border border-gray-200'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
           >
             Yearly
-            <span className="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Save ~17%</span>
+            <span className="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+              Save ~17%
+            </span>
           </button>
         </div>
       </div>
 
       {feedback && (
-        <div className={`mb-4 rounded-lg px-4 py-3 text-sm font-medium ${feedback.type === 'success' ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+        <div
+          className={`mb-4 rounded-lg px-4 py-3 text-sm font-medium ${
+            feedback.type === 'success'
+              ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+              : 'bg-red-50 border border-red-200 text-red-700'
+          }`}
+        >
           {feedback.message}
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {Object.values(PLANS).map((plan) => {
+        {sortedPlans.map((plan) => {
           const isCurrent = plan.id === currentPlanId;
           const price = billingCycle === 'yearly' ? plan.pricing.yearly : plan.pricing.monthly;
           const perLabel = billingCycle === 'yearly' ? '/ year' : '/ month';
@@ -77,7 +98,9 @@ export function SubscriptionPlanCards({ currentPlanId, currentBillingCycle, ends
           return (
             <div
               key={plan.id}
-              className={`bg-white rounded-xl border p-6 shadow-sm flex flex-col ${isCurrent ? 'border-emerald-400 ring-2 ring-emerald-100' : 'border-gray-100'}`}
+              className={`bg-white rounded-xl border p-6 shadow-sm flex flex-col ${
+                isCurrent ? 'border-emerald-400 ring-2 ring-emerald-100' : 'border-gray-100'
+              }`}
             >
               {isCurrent && (
                 <div className="mb-2 inline-flex self-start rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700">
@@ -97,8 +120,15 @@ export function SubscriptionPlanCards({ currentPlanId, currentBillingCycle, ends
                 <li>✓ {featureVal(plan.features.contacts, 'contacts')}</li>
                 <li>✓ {featureVal(plan.features.campaignsPerMonth, 'campaigns/mo')}</li>
                 <li>✓ {featureVal(plan.features.botReplies, 'bot replies')}</li>
-                <li>✓ {plan.features.teamMembers === 0 ? 'No team members' : featureVal(plan.features.teamMembers, 'team members')}</li>
                 <li>✓ {featureVal(plan.features.botFlows, 'bot flows')}</li>
+                <li>✓ {featureVal(plan.features.teamMembers, 'team members')}</li>
+                <li>✓ {featureVal(plan.features.contactCustomFields, 'custom fields')}</li>
+                <li className={plan.features.aiChatBot ? 'text-gray-500' : 'text-gray-300 line-through'}>
+                  {plan.features.aiChatBot ? '✓' : '✗'} AI Chat Bot
+                </li>
+                <li className={plan.features.apiAccess ? 'text-gray-500' : 'text-gray-300 line-through'}>
+                  {plan.features.apiAccess ? '✓' : '✗'} API Access
+                </li>
               </ul>
 
               <div className="mt-4">
@@ -117,7 +147,11 @@ export function SubscriptionPlanCards({ currentPlanId, currentBillingCycle, ends
                     disabled={upgrading === plan.id}
                     className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                   >
-                    {upgrading === plan.id ? 'Upgrading...' : plan.pricing.monthly === 0 ? 'Switch to Free' : 'Upgrade'}
+                    {upgrading === plan.id
+                      ? 'Upgrading...'
+                      : plan.pricing.monthly === 0
+                      ? 'Switch to Free'
+                      : 'Upgrade'}
                   </button>
                 )}
               </div>

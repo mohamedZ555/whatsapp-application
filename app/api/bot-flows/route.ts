@@ -47,12 +47,22 @@ export async function POST(req: NextRequest) {
   const flowName = String(body.flowName ?? '').trim();
   if (!flowName) return NextResponse.json({ error: 'flowName is required.' }, { status: 400 });
 
+  // Validate jobCategoryId if provided
+  const jobCategoryId = body.jobCategoryId ? String(body.jobCategoryId) : null;
+  if (jobCategoryId) {
+    const cat = await prisma.employeeJobCategory.findFirst({
+      where: { id: jobCategoryId, vendorId },
+    });
+    if (!cat) return NextResponse.json({ error: 'Job category not found.' }, { status: 400 });
+  }
+
   const flow = await prisma.botFlow.create({
     data: {
       vendorId,
       flowName,
       description: body.description ? String(body.description) : null,
       status: typeof body.status === 'number' ? body.status : 1,
+      jobCategoryId,
       data: body.data ?? {},
     },
   });

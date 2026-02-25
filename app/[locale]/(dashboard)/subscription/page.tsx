@@ -1,10 +1,12 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getTranslations } from 'next-intl/server';
+import { getServerPlans } from '@/lib/plans';
+import { getVendorUsage } from '@/lib/permissions';
+import { USER_ROLES } from '@/lib/constants';
 import prisma from '@/lib/prisma';
-import { PLANS, USER_ROLES } from '@/lib/constants';
 import { SubscriptionPlanCards } from './plan-cards';
-import { CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 
 function detectBillingCycle(startsAt: Date | null, endsAt: Date | null): 'monthly' | 'yearly' | null {
   if (!startsAt || !endsAt) return null;
@@ -18,24 +20,58 @@ function daysLeft(endsAt: Date | null): number | null {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
-function UsageBar({ label, used, limit }: { label: string; used: number; limit: number }) {
+function UsageBar({
+  label,
+  used,
+  limit,
+}: {
+  label: string;
+  used: number;
+  limit: number;
+}) {
   const unlimited = limit === -1;
-  const pct = unlimited ? 0 : limit === 0 ? 100 : Math.min(100, Math.round((used / limit) * 100));
-  const color = unlimited ? 'bg-emerald-400' : pct >= 90 ? 'bg-rose-400' : pct >= 70 ? 'bg-amber-400' : 'bg-emerald-400';
+  const notAllowed = limit === 0;
+  const pct = unlimited || notAllowed ? 0 : limit === 0 ? 100 : Math.min(100, Math.round((used / limit) * 100));
+  const color =
+    notAllowed
+      ? 'bg-slate-300'
+      : unlimited
+      ? 'bg-emerald-400'
+      : pct >= 90
+      ? 'bg-rose-400'
+      : pct >= 70
+      ? 'bg-amber-400'
+      : 'bg-emerald-400';
+
   return (
     <div>
       <div className="flex items-center justify-between mb-1 text-sm">
         <span className="font-medium text-slate-700">{label}</span>
         <span className="text-slate-500 text-xs">
-          {used} / {unlimited ? '∞' : limit === 0 ? '0' : limit}
+          {notAllowed ? (
+            <span className="text-rose-500 font-semibold">Not included</span>
+          ) : (
+            <>
+              {used} / {unlimited ? '∞' : limit}
+              {!unlimited && limit > 0 && (
+                <span className="ml-1 text-slate-400">({pct}%)</span>
+              )}
+            </>
+          )}
         </span>
       </div>
       <div className="h-2 w-full rounded-full bg-slate-100">
-        {!unlimited && limit > 0 && (
+        {!unlimited && !notAllowed && limit > 0 && (
           <div className={`h-2 rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
         )}
         {unlimited && <div className="h-2 rounded-full bg-emerald-400 w-1/3" />}
+        {notAllowed && <div className="h-2 rounded-full bg-slate-300 w-full" />}
       </div>
+      {!unlimited && !notAllowed && limit > 0 && pct >= 90 && (
+        <p className="mt-0.5 text-[11px] text-rose-500 font-medium">
+          {pct >= 100 ? 'Limit reached — upgrade to add more' : `${limit - used} remaining`}
+        </p>
+      )}
     </div>
   );
 }
@@ -60,43 +96,46 @@ export default async function SubscriptionPage() {
   const session = await getServerSession(authOptions);
   const t = await getTranslations('subscription');
 
-  const vendorId = (session?.user as any)?.vendorId as string | undefined;
+  const user = session?.user as any;
+  const vendorId = user?.vendorId as string | undefined;
+  const roleId = user?.roleId as number | undefined;
 
-  // Fetch all data in parallel
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (!vendorId || roleId === USER_ROLES.SUPER_ADMIN) {
+    return (
+      <div className="flex items-center justify-center h-64 text-slate-500">
+        No vendor context available.
+      </div>
+    );
+  }
 
-  const [activeSub, history, contactsCount, teamCount, botRepliesCount, botFlowsCount, campaignsCount] =
-    await Promise.all([
-      vendorId
-        ? prisma.subscription.findFirst({ where: { vendorId, status: 'active' }, orderBy: { createdAt: 'desc' } })
-        : null,
-      vendorId
-        ? prisma.subscription.findMany({
-            where: { vendorId },
-            orderBy: { createdAt: 'desc' },
-            take: 20,
-          })
-        : [],
-      vendorId ? prisma.contact.count({ where: { vendorId } }) : 0,
-      vendorId
-        ? prisma.user.count({ where: { vendorId, roleId: USER_ROLES.VENDOR_USER } })
-        : 0,
-      vendorId ? prisma.botReply.count({ where: { vendorId } }) : 0,
-      vendorId ? prisma.botFlow.count({ where: { vendorId } }) : 0,
-      vendorId
-        ? prisma.campaign.count({ where: { vendorId, createdAt: { gte: monthStart } } })
-        : 0,
-    ]);
+  const [usageResult, plans, history] = await Promise.all([
+    getVendorUsage(vendorId),
+    getServerPlans(),
+    prisma_history(vendorId),
+  ]);
 
-  const currentPlanId = ((activeSub?.planId ?? 'free') as keyof typeof PLANS);
-  const currentPlan = PLANS[currentPlanId];
-  const billingCycle = detectBillingCycle(activeSub?.startsAt ?? null, activeSub?.endsAt ?? null);
-  const remaining = daysLeft(activeSub?.endsAt ?? null);
+  const { plan: currentPlan, planId: currentPlanId, subscription: activeSub, isExpired, items } = usageResult;
+  const billingCycle = activeSub
+    ? detectBillingCycle(activeSub.startsAt, activeSub.endsAt)
+    : null;
+  const remaining = activeSub ? daysLeft(activeSub.endsAt) : null;
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
+
+      {/* Expired / no active plan warning */}
+      {isExpired && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold text-amber-800">Your plan has expired</p>
+            <p className="text-sm text-amber-700 mt-0.5">
+              You are currently on the <strong>Free</strong> tier limits. Upgrade below to restore full access.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Current plan hero card */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-700 to-emerald-900 p-6 text-white shadow-lg">
@@ -114,14 +153,19 @@ export default async function SubscriptionPage() {
               )}
             </div>
             <div className="mt-2 flex flex-wrap gap-3 text-sm text-emerald-100">
-              {activeSub?.status === 'active' && (
+              {activeSub?.status === 'active' && !isExpired && (
                 <span className="flex items-center gap-1">
                   <CheckCircle2 className="h-3.5 w-3.5" /> Active
                 </span>
               )}
-              {activeSub?.endsAt && (
+              {activeSub?.endsAt && !isExpired && (
                 <span>
-                  Renews {new Date(activeSub.endsAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  Renews{' '}
+                  {new Date(activeSub.endsAt).toLocaleDateString('en-US', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
                 </span>
               )}
               {remaining !== null && remaining <= 7 && remaining > 0 && (
@@ -143,6 +187,11 @@ export default async function SubscriptionPage() {
                 {billingCycle === 'yearly' ? '/yr' : '/mo'}
               </span>
             </p>
+            {billingCycle === 'yearly' && currentPlan.pricing.monthly > 0 && (
+              <p className="text-xs text-emerald-300 mt-0.5">
+                vs ${currentPlan.pricing.monthly * 12}/yr monthly
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -151,11 +200,15 @@ export default async function SubscriptionPage() {
       <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h3 className="font-semibold text-gray-900 mb-4">Current Usage</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <UsageBar label="Contacts" used={contactsCount} limit={currentPlan.features.contacts} />
-          <UsageBar label="Campaigns this month" used={campaignsCount} limit={currentPlan.features.campaignsPerMonth} />
-          <UsageBar label="Bot Replies" used={botRepliesCount} limit={currentPlan.features.botReplies} />
-          <UsageBar label="Bot Flows" used={botFlowsCount} limit={currentPlan.features.botFlows} />
-          <UsageBar label="Team Members" used={teamCount} limit={currentPlan.features.teamMembers} />
+          {items.map((item) => (
+            <UsageBar key={item.key} label={item.label} used={item.used} limit={item.limit} />
+          ))}
+        </div>
+
+        {/* Feature flags row */}
+        <div className="mt-5 flex flex-wrap gap-3 border-t border-gray-100 pt-4">
+          <FeaturePill label="AI Chat Bot" enabled={currentPlan.features.aiChatBot} />
+          <FeaturePill label="API Access" enabled={currentPlan.features.apiAccess} />
         </div>
       </div>
 
@@ -165,7 +218,8 @@ export default async function SubscriptionPage() {
         <SubscriptionPlanCards
           currentPlanId={currentPlanId}
           currentBillingCycle={billingCycle}
-          endsAt={activeSub?.endsAt?.toISOString() ?? null}
+          endsAt={activeSub?.endsAt ? new Date(activeSub.endsAt).toISOString() : null}
+          plans={plans}
         />
       </div>
 
@@ -189,22 +243,36 @@ export default async function SubscriptionPage() {
               <tbody className="divide-y divide-gray-50">
                 {history.map((sub) => {
                   const cycle = detectBillingCycle(sub.startsAt, sub.endsAt);
-                  const planTitle = PLANS[sub.planId as keyof typeof PLANS]?.title ?? sub.planId;
+                  const planTitle = plans[sub.planId]?.title ?? sub.planId;
                   return (
                     <tr key={sub.id} className="hover:bg-gray-50/50">
                       <td className="px-6 py-3 font-medium text-gray-800">{planTitle}</td>
                       <td className="px-6 py-3 text-gray-500 capitalize">{cycle ?? '—'}</td>
                       <td className="px-6 py-3">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize ${statusBadgeClass(sub.status)}`}>
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize ${statusBadgeClass(sub.status)}`}
+                        >
                           {statusIcon(sub.status)}
                           {sub.status}
                         </span>
                       </td>
                       <td className="px-6 py-3 text-gray-500">
-                        {sub.startsAt ? new Date(sub.startsAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                        {sub.startsAt
+                          ? new Date(sub.startsAt).toLocaleDateString('en-US', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : '—'}
                       </td>
                       <td className="px-6 py-3 text-gray-500">
-                        {sub.endsAt ? new Date(sub.endsAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                        {sub.endsAt
+                          ? new Date(sub.endsAt).toLocaleDateString('en-US', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : '—'}
                       </td>
                     </tr>
                   );
@@ -216,4 +284,27 @@ export default async function SubscriptionPage() {
       )}
     </div>
   );
+}
+
+function FeaturePill({ label, enabled }: { label: string; enabled: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+        enabled
+          ? 'bg-emerald-100 text-emerald-700'
+          : 'bg-slate-100 text-slate-400 line-through'
+      }`}
+    >
+      {enabled ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+      {label}
+    </span>
+  );
+}
+
+async function prisma_history(vendorId: string) {
+  return prisma.subscription.findMany({
+    where: { vendorId },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
 }
