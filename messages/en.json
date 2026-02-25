@@ -383,7 +383,19 @@
     "appLogo": "App Logo",
     "favicon": "Favicon",
     "allowRegistration": "Allow User Registration",
-    "requireActivation": "Require Email Activation"
+    "requireActivation": "Require Email Activation",
+    "plans": "Plans",
+    "approve": "Approve",
+    "ban": "Ban",
+    "unban": "Unban",
+    "pendingVendors": "Pending Vendors",
+    "filterAll": "All",
+    "filterPending": "Pending",
+    "filterActive": "Active",
+    "filterBanned": "Banned",
+    "confirmApprove": "Approve this vendor? They will be able to login.",
+    "confirmBan": "Ban this vendor? All their users will be blocked.",
+    "confirmUnban": "Restore this vendor to active status?"
   },
   "landing": {
     "hero": {

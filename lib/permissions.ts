@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
-import { PLANS, type PlanId } from '@/lib/constants';
+import { type PlanId } from '@/lib/constants';
+import { getServerPlans } from '@/lib/plans';
 
 export async function getVendorSubscription(vendorId: string) {
   return prisma.subscription.findFirst({
@@ -10,30 +11,33 @@ export async function getVendorSubscription(vendorId: string) {
 
 export async function checkLimit(
   vendorId: string,
-  featureKey: keyof (typeof PLANS)['free']['features']
+  featureKey: string
 ): Promise<boolean> {
-  const subscription = await getVendorSubscription(vendorId);
-  const planId = (subscription?.planId ?? 'free') as PlanId;
-  const plan = PLANS[planId];
-  const limit = plan.features[featureKey];
+  const [subscription, plans] = await Promise.all([
+    getVendorSubscription(vendorId),
+    getServerPlans(),
+  ]);
+  const planId = subscription?.planId ?? 'free';
+  const plan = plans[planId] ?? plans['free'];
+  if (!plan) return true;
+  const limit = (plan.features as Record<string, number | boolean>)[featureKey];
 
   if (typeof limit === 'boolean') return limit;
-  if (limit === -1) return true; // unlimited
+  if (limit === undefined) return true;
+  if (limit === -1) return true;
 
   let currentCount = 0;
-
   switch (featureKey) {
     case 'contacts':
       currentCount = await prisma.contact.count({ where: { vendorId, status: 1 } });
       break;
-    case 'campaignsPerMonth':
+    case 'campaignsPerMonth': {
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
-      currentCount = await prisma.campaign.count({
-        where: { vendorId, createdAt: { gte: startOfMonth } },
-      });
+      currentCount = await prisma.campaign.count({ where: { vendorId, createdAt: { gte: startOfMonth } } });
       break;
+    }
     case 'botReplies':
       currentCount = await prisma.botReply.count({ where: { vendorId, status: 1 } });
       break;
@@ -52,9 +56,6 @@ export async function checkLimit(
   return currentCount < (limit as number);
 }
 
-export function hasPermission(
-  permissions: string[],
-  permission: string
-): boolean {
+export function hasPermission(permissions: string[], permission: string): boolean {
   return permissions.includes(permission);
 }

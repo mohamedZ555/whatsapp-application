@@ -383,7 +383,19 @@
     "appLogo": "شعار التطبيق",
     "favicon": "أيقونة الموقع",
     "allowRegistration": "السماح بالتسجيل",
-    "requireActivation": "طلب تفعيل البريد"
+    "requireActivation": "طلب تفعيل البريد",
+    "plans": "الخطط",
+    "approve": "موافقة",
+    "ban": "حظر",
+    "unban": "رفع الحظر",
+    "pendingVendors": "البائعون المعلقون",
+    "filterAll": "الكل",
+    "filterPending": "معلق",
+    "filterActive": "نشط",
+    "filterBanned": "محظور",
+    "confirmApprove": "هل تريد الموافقة على هذا البائع؟ سيتمكن من تسجيل الدخول.",
+    "confirmBan": "هل تريد حظر هذا البائع؟ سيتم حظر جميع مستخدميه.",
+    "confirmUnban": "هل تريد استعادة هذا البائع إلى الحالة النشطة؟"
   },
   "landing": {
     "hero": {

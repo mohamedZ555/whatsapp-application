@@ -53,8 +53,8 @@ export default function RegisterPage() {
     if (!res.ok) {
       setError(data.error ?? te('serverError'));
     } else {
-      setSuccess(t('emailVerificationSent'));
-      setTimeout(() => router.push('/login'), 3000);
+      setSuccess('Your account is pending approval. You will be able to login once an administrator approves your account.');
+      setTimeout(() => router.push('/login'), 5000);
     }
   }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from '@/i18n/navigation';
+import { useRouter } from 'next/navigation';
 import { VendorActionsCell } from './actions';
 
 type Props = {
@@ -11,21 +11,18 @@ type Props = {
     uid: string;
     status: number;
   };
+  adminUserStatus: number | null;
   subscriptionPlanId?: string | null;
 };
 
-export function VendorActionsWrapper({ vendor, subscriptionPlanId }: Props) {
+export function VendorActionsWrapper({ vendor, adminUserStatus, subscriptionPlanId }: Props) {
   const router = useRouter();
-
-  function handleRefresh() {
-    router.refresh();
-  }
-
   return (
     <VendorActionsCell
       vendor={vendor}
+      adminUserStatus={adminUserStatus}
       subscriptionPlanId={subscriptionPlanId}
-      onRefresh={handleRefresh}
+      onRefresh={() => router.refresh()}
     />
   );
 }

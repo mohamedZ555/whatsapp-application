@@ -7,6 +7,7 @@ import {
   FileText,
   Gauge,
   Globe,
+  LayoutList,
   Settings2,
   Users,
 } from "lucide-react";
@@ -22,7 +23,8 @@ type AdminNavItem = {
     | "subscriptions"
     | "translations"
     | "pages"
-    | "configuration";
+    | "configuration"
+    | "plans";
   icon: ComponentType<{ className?: string }>;
 };
 
@@ -41,6 +43,7 @@ const navItems: AdminNavItem[] = [
     labelKey: "configuration",
     icon: Settings2,
   },
+  { key: "plans", href: "/admin/plans", labelKey: "plans", icon: LayoutList },
 ];
 
 export default function AdminSidebar() {

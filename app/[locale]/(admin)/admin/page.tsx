@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma';
 import { Link } from '@/i18n/navigation';
 import { getTranslations } from 'next-intl/server';
+import { PLANS } from '@/lib/constants';
 
 export default async function AdminDashboardPage() {
   const tAdmin = await getTranslations('admin');
@@ -69,7 +70,7 @@ export default async function AdminDashboardPage() {
             {recentVendors.map((vendor) => (
               <tr key={vendor.id} className="hover:bg-emerald-50/40">
                 <td className="px-4 py-3 font-medium text-slate-900">{vendor.title ?? vendor.uid}</td>
-                <td className="px-4 py-3 text-slate-600">{vendor.subscriptions[0]?.planId ?? 'free'}</td>
+                <td className="px-4 py-3 text-slate-600">{PLANS[vendor.subscriptions[0]?.planId as keyof typeof PLANS]?.title ?? 'Free'}</td>
                 <td className="px-4 py-3 text-slate-600">{vendor._count.contacts}</td>
                 <td className="px-4 py-3 text-slate-500">{new Date(vendor.createdAt).toLocaleDateString()}</td>
               </tr>

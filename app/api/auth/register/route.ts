@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
+import { USER_STATUS, VENDOR_STATUS } from '@/lib/constants';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,13 +20,18 @@ export async function POST(req: NextRequest) {
 
     const hashed = await bcrypt.hash(password, 12);
 
+    // Vendor starts as PENDING (status=2) — not active until super admin approves
     const vendor = await prisma.vendor.create({
-      data: { title: `${firstName} ${lastName}'s Workspace` },
+      data: {
+        title: `${firstName} ${lastName}'s Workspace`,
+        status: VENDOR_STATUS.PENDING,
+      },
     });
 
     const role = await prisma.userRole.findFirst({ where: { title: 'Vendor' } });
 
-    const user = await prisma.user.create({
+    // User starts as PENDING (status=4) — can't login until approved
+    await prisma.user.create({
       data: {
         firstName,
         lastName,
@@ -35,7 +41,7 @@ export async function POST(req: NextRequest) {
         password: hashed,
         roleId: role?.id ?? 2,
         vendorId: vendor.id,
-        status: 1,
+        status: USER_STATUS.PENDING,
       },
     });
 
@@ -43,8 +49,8 @@ export async function POST(req: NextRequest) {
       data: { vendorId: vendor.id, planId: 'free', status: 'active' },
     });
 
-    return NextResponse.json({ success: true, message: 'Account created successfully.' });
-  } catch (e: any) {
+    return NextResponse.json({ success: true, message: 'Account created. Please wait for admin approval before logging in.' });
+  } catch (e: unknown) {
     console.error(e);
     return NextResponse.json({ error: 'Server error.' }, { status: 500 });
   }

@@ -85,8 +85,16 @@ export const USER_STATUS = {
   ACTIVE: 1,
   INACTIVE: 2,
   SUSPENDED: 3,
+  PENDING: 4,
   DELETED: 5,
   BLOCKED: 6,
+} as const;
+
+export const VENDOR_STATUS = {
+  DELETED: 0,
+  ACTIVE: 1,
+  PENDING: 2,
+  BANNED: 3,
 } as const;
 
 export const CAMPAIGN_STATUS = {

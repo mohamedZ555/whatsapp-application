@@ -132,6 +132,51 @@ export async function PUT(req: NextRequest) {
   return NextResponse.json({ success: true, data: updated });
 }
 
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  const actor = getActorFromSession(session);
+  if (!actor || !isSuperAdmin(actor)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const body = await req.json();
+  const vendorId = typeof body.vendorId === 'string' ? body.vendorId : null;
+  const action = typeof body.action === 'string' ? body.action : null;
+
+  if (!vendorId) return NextResponse.json({ error: 'vendorId is required.' }, { status: 400 });
+  if (!action || !['approve', 'ban', 'unban'].includes(action)) {
+    return NextResponse.json({ error: 'action must be approve, ban, or unban.' }, { status: 400 });
+  }
+
+  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { id: true } });
+  if (!vendor) return NextResponse.json({ error: 'Vendor not found.' }, { status: 404 });
+
+  if (action === 'approve') {
+    // Activate vendor and their admin user
+    await prisma.vendor.update({ where: { id: vendorId }, data: { status: 1 } });
+    await prisma.user.updateMany({
+      where: { vendorId, roleId: 2, status: { in: [2, 3, 4] } },
+      data: { status: 1 },
+    });
+  } else if (action === 'ban') {
+    // Ban vendor and block all their users
+    await prisma.vendor.update({ where: { id: vendorId }, data: { status: 3 } });
+    await prisma.user.updateMany({
+      where: { vendorId, status: { not: 5 } },
+      data: { status: 6 },
+    });
+  } else if (action === 'unban') {
+    // Restore vendor to active
+    await prisma.vendor.update({ where: { id: vendorId }, data: { status: 1 } });
+    await prisma.user.updateMany({
+      where: { vendorId, status: 6 },
+      data: { status: 1 },
+    });
+  }
+
+  return NextResponse.json({ success: true });
+}
+
 export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const actor = getActorFromSession(session);
