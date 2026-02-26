@@ -23,7 +23,7 @@ export async function proxy(request: NextRequest) {
   const isDashboardRoute =
     pathWithoutLocale.startsWith('/dashboard') ||
     pathWithoutLocale.match(
-      /^\/(contacts|chat|campaigns|templates|bot-replies|message-log|users|subscription|settings)/,
+      /^\/(contacts|chat|campaigns|templates|bot-replies|message-log|users|subscription|support|transactions|settings)/,
     );
   const isAdminRoute = pathWithoutLocale.startsWith('/admin');
   const isAuthPage = pathWithoutLocale === '/login' || pathWithoutLocale === '/register';

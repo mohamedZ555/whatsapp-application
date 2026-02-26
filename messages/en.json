@@ -13,7 +13,8 @@
     "settings": "Settings",
     "whatsappSettings": "WhatsApp Setup",
     "adminPanel": "Admin Console",
-    "logout": "Logout"
+    "logout": "Logout",
+    "support": "Support"
   },
   "auth": {
     "login": "Login",
@@ -397,7 +398,9 @@
     "filterBanned": "Banned",
     "confirmApprove": "Approve this vendor? They will be able to login.",
     "confirmBan": "Ban this vendor? All their users will be blocked.",
-    "confirmUnban": "Restore this vendor to active status?"
+    "confirmUnban": "Restore this vendor to active status?",
+    "contactInbox": "Contact Inbox",
+    "supportTickets": "Support Tickets"
   },
   "landing": {
     "hero": {
@@ -429,22 +432,63 @@
       "apiDesc": "Integrate with your existing tools via our REST API.",
       "subtitle": "Core modules you need for messaging, automation, and team execution."
     },
+    "nav": {
+      "features": "Features",
+      "pricing": "Pricing",
+      "contact": "Contact"
+    },
     "pricing": {
-      "title": "Simple Pricing",
-      "subtitle": "Choose a plan that fits your needs.",
+      "title": "Simple, Transparent Pricing",
+      "subtitle": "Choose a plan that fits your needs. Upgrade or downgrade anytime.",
       "mostPopular": "Most Popular",
       "perMonth": "month",
+      "perYear": "year",
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "savePercent": "Save up to 17%",
       "contacts": "Contacts",
       "campaigns": "Campaigns/mo",
       "team": "Team members",
-      "unlimited": "Unlimited"
+      "botReplies": "Bot replies/mo",
+      "botFlows": "Bot flows",
+      "apiAccess": "API Access",
+      "aiChatBot": "AI ChatBot",
+      "trialDays": "{days}-day free trial",
+      "unlimited": "Unlimited",
+      "free": "Free",
+      "startTrial": "Start Free Trial",
+      "getStartedFree": "Get Started Free",
+      "choosePlan": "Choose Plan"
+    },
+    "faq": {
+      "title": "Frequently Asked Questions",
+      "subtitle": "Have more questions? Reach out via our contact page.",
+      "q1": "Can I change my plan later?",
+      "a1": "Yes. You can upgrade or downgrade your plan at any time from your dashboard. Changes take effect immediately.",
+      "q2": "Is there a free plan?",
+      "a2": "Yes, our Free plan lets you get started with up to 2 contacts and 10 campaigns per month — no credit card required.",
+      "q3": "Do you support Arabic (RTL) interface?",
+      "a3": "Absolutely. FadaaWhats is fully bilingual (English & Arabic) with complete RTL layout support.",
+      "q4": "How does the WhatsApp connection work?",
+      "a4": "We use the official WhatsApp Business API. You connect your business number through embedded signup — no technical knowledge required.",
+      "q5": "Can I cancel anytime?",
+      "a5": "Yes, you can cancel your subscription at any time. You keep access until the end of your billing period."
+    },
+    "testimonials": {
+      "title": "Trusted by Businesses",
+      "subtitle": "See what our customers say about FadaaWhats."
     },
     "contact": {
       "title": "Contact Us",
+      "subtitle": "We typically respond within one business day.",
       "name": "Name",
       "email": "Email",
       "message": "Message",
-      "send": "Send Message"
+      "send": "Send Message",
+      "sending": "Sending...",
+      "successTitle": "Message sent!",
+      "successDesc": "Thank you for reaching out. We'll get back to you soon.",
+      "errorDesc": "Something went wrong. Please try again."
     },
     "footer": {
       "terms": "Terms of Service",

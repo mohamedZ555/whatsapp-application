@@ -17,17 +17,18 @@ export default async function DynamicPage({ params }: Props) {
   if (!page) notFound();
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-3xl mx-auto px-6 py-12">
-        <Link href="/" className="text-sm text-green-600 hover:underline mb-6 inline-block">
-          {'<-'} {tCommon('back')}
-        </Link>
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">{page.title}</h1>
-        <div
-          className="prose prose-gray max-w-none"
-          dangerouslySetInnerHTML={{ __html: page.content ?? '' }}
-        />
-      </div>
+    <div className="mx-auto max-w-3xl px-6 py-12">
+      <Link href="/" className="inline-flex items-center gap-1 text-sm text-green-600 hover:underline mb-8">
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        {tCommon('back')}
+      </Link>
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">{page.title}</h1>
+      <article
+        className="prose prose-gray max-w-none prose-headings:font-bold prose-a:text-green-600"
+        dangerouslySetInnerHTML={{ __html: page.content ?? '' }}
+      />
     </div>
   );
 }

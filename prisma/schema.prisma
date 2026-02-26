@@ -127,6 +127,7 @@ model Vendor {
   messageLogs         WhatsappMessageLog[]
   messageQueues       WhatsappMessageQueue[]
   templates           WhatsappTemplate[]
+  supportTickets      SupportTicket[]
 
   @@map("vendors")
 }
@@ -564,4 +565,41 @@ model ApiToken {
   vendor    Vendor    @relation(fields: [vendorId], references: [id])
 
   @@map("api_tokens")
+}
+
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@map("contact_messages")
+}
+
+model SupportTicket {
+  id        String               @id @default(cuid())
+  uid       String               @unique @default(cuid())
+  vendorId  String
+  subject   String
+  status    String               @default("open")
+  priority  String               @default("normal")
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  vendor    Vendor               @relation(fields: [vendorId], references: [id])
+  replies   SupportTicketReply[]
+
+  @@map("support_tickets")
+}
+
+model SupportTicketReply {
+  id        String        @id @default(cuid())
+  ticketId  String
+  content   String
+  isAdmin   Boolean       @default(false)
+  createdAt DateTime      @default(now())
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("support_ticket_replies")
 }

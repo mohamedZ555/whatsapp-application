@@ -3,7 +3,7 @@ import { USER_ROLES, type VendorPermission } from '@/lib/constants';
 export type DashboardNavItem = {
   key: string;
   href: string;
-  icon: 'layout' | 'users' | 'message-circle' | 'megaphone' | 'file-text' | 'bot' | 'history' | 'shield' | 'gem' | 'settings' | 'smartphone' | 'receipt';
+  icon: 'layout' | 'users' | 'message-circle' | 'megaphone' | 'file-text' | 'bot' | 'history' | 'shield' | 'gem' | 'settings' | 'smartphone' | 'receipt' | 'headphones';
   requiredPermission?: VendorPermission;
   ownerOnly?: boolean;
   superAdminOnly?: boolean;
@@ -20,6 +20,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
   { key: 'users', href: '/users', icon: 'shield', requiredPermission: 'manage_users' },
   { key: 'subscription', href: '/subscription', icon: 'gem', ownerOnly: true },
   { key: 'transactions', href: '/transactions', icon: 'receipt', ownerOnly: true },
+  { key: 'support', href: '/support', icon: 'headphones', ownerOnly: true },
   { key: 'settings', href: '/settings', icon: 'settings', ownerOnly: true },
   { key: 'adminPanel', href: '/admin', icon: 'shield', superAdminOnly: true },
 ];
@@ -59,6 +60,7 @@ export function canAccessVendorPath(
     { path: '/users', permission: 'manage_users' },
     { path: '/subscription', ownerOnly: true },
     { path: '/transactions', ownerOnly: true },
+    { path: '/support', ownerOnly: true },
     { path: '/settings', ownerOnly: true },
   ];
 

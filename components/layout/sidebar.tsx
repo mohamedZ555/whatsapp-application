@@ -8,6 +8,7 @@ import {
   Bot,
   FileText,
   Gem,
+  Headphones,
   History,
   LayoutDashboard,
   Megaphone,
@@ -33,14 +34,15 @@ const iconMap = {
   receipt: Receipt,
   settings: Settings,
   smartphone: Smartphone,
+  headphones: Headphones,
 } as const;
 
 export default function Sidebar() {
   const t = useTranslations('nav');
   const pathname = usePathname();
   const { data: session } = useSession();
-  const roleId = (session?.user as any)?.roleId as number | undefined;
-  const permissions = (session?.user as any)?.permissions as string[] | undefined;
+  const roleId = (session?.user as { roleId?: number } | undefined)?.roleId;
+  const permissions = (session?.user as { permissions?: string[] } | undefined)?.permissions;
 
   const navItems = DASHBOARD_NAV_ITEMS.filter((item) => canAccessDashboardItem(roleId, permissions, item));
 
@@ -59,7 +61,7 @@ export default function Sidebar() {
         <ul className="space-y-0.5 px-3">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-            const Icon = iconMap[item.icon];
+            const Icon = iconMap[item.icon as keyof typeof iconMap] ?? LayoutDashboard;
 
             return (
               <li key={item.key}>
@@ -73,7 +75,7 @@ export default function Sidebar() {
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  <span>{t(item.key)}</span>
+                  <span>{t(item.key as Parameters<typeof t>[0])}</span>
                 </Link>
               </li>
             );

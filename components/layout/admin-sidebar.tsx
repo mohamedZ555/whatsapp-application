@@ -6,8 +6,9 @@ import {
   CreditCard,
   FileText,
   Gauge,
-  Globe,
+  Inbox,
   LayoutList,
+  MessagesSquare,
   Receipt,
   Settings2,
   Users,
@@ -18,40 +19,21 @@ import { useTranslations } from "next-intl";
 type AdminNavItem = {
   key: string;
   href: string;
-  labelKey:
-    | "dashboard"
-    | "vendors"
-    | "subscriptions"
-    | "transactions"
-    | "translations"
-    | "pages"
-    | "configuration"
-    | "plans";
+  labelKey: string;
   icon: ComponentType<{ className?: string }>;
+  exact?: boolean;
 };
 
 const navItems: AdminNavItem[] = [
-  { key: "dashboard", href: "/admin", labelKey: "dashboard", icon: Gauge },
+  { key: "dashboard", href: "/admin", labelKey: "dashboard", icon: Gauge, exact: true },
   { key: "vendors", href: "/admin/vendors", labelKey: "vendors", icon: Users },
-  {
-    key: "subscriptions",
-    href: "/admin/subscriptions",
-    labelKey: "subscriptions",
-    icon: CreditCard,
-  },
-  {
-    key: "transactions",
-    href: "/admin/transactions",
-    labelKey: "transactions",
-    icon: Receipt,
-  },
-  {
-    key: "configuration",
-    href: "/admin/configuration/general",
-    labelKey: "configuration",
-    icon: Settings2,
-  },
+  { key: "subscriptions", href: "/admin/subscriptions", labelKey: "subscriptions", icon: CreditCard },
+  { key: "transactions", href: "/admin/transactions", labelKey: "transactions", icon: Receipt },
   { key: "plans", href: "/admin/plans", labelKey: "plans", icon: LayoutList },
+  { key: "pages", href: "/admin/pages", labelKey: "pages", icon: FileText },
+  { key: "contact-inbox", href: "/admin/contact-inbox", labelKey: "contactInbox", icon: Inbox },
+  { key: "support", href: "/admin/support", labelKey: "supportTickets", icon: MessagesSquare },
+  { key: "configuration", href: "/admin/configuration/general", labelKey: "configuration", icon: Settings2 },
 ];
 
 export default function AdminSidebar() {
@@ -77,8 +59,9 @@ export default function AdminSidebar() {
         <ul className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const isActive = item.exact
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <li key={item.key}>
                 <Link
@@ -91,7 +74,7 @@ export default function AdminSidebar() {
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  <span>{tAdmin(item.labelKey)}</span>
+                  <span>{tAdmin(item.labelKey as Parameters<typeof tAdmin>[0])}</span>
                 </Link>
               </li>
             );

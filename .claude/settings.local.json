@@ -20,7 +20,12 @@
       "Bash(cd /d/whatsapp-application && npx tsc --noEmit 2>&1)",
       "Bash(cd /d/whatsapp-application && taskkill /F /IM node.exe 2>&1; sleep 2 && npx prisma generate 2>&1)",
       "Bash(cd /d/whatsapp-application && npx prisma validate 2>&1)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(echo \"\" >> D:/whatsapp-application/prisma/schema.prisma && cat >> D:/whatsapp-application/prisma/schema.prisma << 'EOF'\n\nmodel ContactMessage {\n  id        String   @id @default\\(cuid\\(\\)\\)\n  name      String\n  email     String\n  message   String\n  createdAt DateTime @default\\(now\\(\\)\\)\n\n  @@map\\(\"contact_messages\"\\)\n}\nEOF)",
+      "Bash(cat:*)",
+      "Bash(cd D:/whatsapp-application && npx prisma generate --no-engine 2>&1)",
+      "Bash(python3:*)",
+      "Bash(node:*)"
     ]
   }
 }
