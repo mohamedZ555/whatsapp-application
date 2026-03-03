@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import { computePlanDisabledPerms } from '@/lib/access';
 import { getServerPlans, type PlanConfig } from '@/lib/plans';
 
 export async function getVendorSubscription(vendorId: string) {
@@ -116,6 +117,26 @@ export async function checkLimit(vendorId: string, featureKey: string): Promise<
   }
 
   return currentCount < (limit as number);
+}
+
+export function toPermissionArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
+export async function getPlanDisabledPermsForVendor(vendorId: string): Promise<string[]> {
+  if (!vendorId) return [];
+
+  const [subscription, plans] = await Promise.all([
+    getVendorSubscription(vendorId),
+    getServerPlans(),
+  ]);
+
+  const planId = subscription?.planId ?? 'free';
+  const plan = plans[planId] ?? plans['free'];
+  if (!plan) return [];
+
+  return computePlanDisabledPerms(plan.features);
 }
 
 export function hasPermission(permissions: string[], permission: string): boolean {

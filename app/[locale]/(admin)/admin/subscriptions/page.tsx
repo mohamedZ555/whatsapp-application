@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslations } from 'next-intl';
 import { PLANS } from '@/lib/constants';
 
 const PLAN_OPTIONS = Object.values(PLANS).map((p) => ({ id: p.id, label: p.title }));
@@ -17,10 +18,10 @@ type Sub = {
   vendor: { id: string; title: string | null; slug: string | null; uid: string };
 };
 
-function billingCycleLabel(sub: Sub) {
+function billingCycleLabel(sub: Sub, tAdmin: (k: string) => string) {
   if (!sub.startsAt || !sub.endsAt) return '—';
   const days = (new Date(sub.endsAt).getTime() - new Date(sub.startsAt).getTime()) / (1000 * 60 * 60 * 24);
-  return days >= 300 ? 'Yearly' : 'Monthly';
+  return days >= 300 ? tAdmin('yearly') : tAdmin('monthly');
 }
 
 function statusBadge(status: string) {
@@ -38,6 +39,8 @@ function planLabel(id: string) {
 }
 
 function AddSubscriptionModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const tAdmin = useTranslations('admin');
+  const tCommon = useTranslations('common');
   const [vendors, setVendors] = useState<Array<{ id: string; title: string | null; uid: string }>>([]);
   const [vendorId, setVendorId] = useState('');
   const [planId, setPlanId] = useState('free');
@@ -66,18 +69,18 @@ function AddSubscriptionModal({ onClose, onCreated }: { onClose: () => void; onC
       });
       const data = await res.json();
       if (data.success) { onCreated(); onClose(); }
-      else setError(data.error ?? 'Error');
-    } catch { setError('Error'); }
+      else setError(data.error ?? tCommon('error'));
+    } catch { setError(tCommon('error')); }
     finally { setLoading(false); }
   }
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Add Subscription</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">{tAdmin('addSubscription')}</h2>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('vendor')}</label>
             <select value={vendorId} onChange={(e) => setVendorId(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" required>
               {vendors.map((v) => (
@@ -86,29 +89,29 @@ function AddSubscriptionModal({ onClose, onCreated }: { onClose: () => void; onC
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('plan')}</label>
             <select value={planId} onChange={(e) => setPlanId(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
               {PLAN_OPTIONS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Billing Cycle</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('billingCycle')}</label>
             <select value={billingCycle} onChange={(e) => setBillingCycle(e.target.value as 'monthly' | 'yearly')}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
+              <option value="monthly">{tAdmin('monthly')}</option>
+              <option value="yearly">{tAdmin('yearly')}</option>
             </select>
           </div>
           {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>}
           <div className="flex gap-2 pt-2">
             <button type="submit" disabled={loading}
               className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">
-              {loading ? 'Creating...' : 'Create'}
+              {loading ? tAdmin('creating') : tCommon('create')}
             </button>
             <button type="button" onClick={onClose}
               className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
-              Cancel
+              {tCommon('cancel')}
             </button>
           </div>
         </form>
@@ -119,6 +122,8 @@ function AddSubscriptionModal({ onClose, onCreated }: { onClose: () => void; onC
 }
 
 function EditModal({ sub, onClose, onSaved }: { sub: Sub; onClose: () => void; onSaved: () => void }) {
+  const tAdmin = useTranslations('admin');
+  const tCommon = useTranslations('common');
   const [planId, setPlanId] = useState(sub.planId);
   const [status, setStatus] = useState(sub.status);
   const [startsAt, setStartsAt] = useState(sub.startsAt ? sub.startsAt.slice(0, 10) : '');
@@ -138,26 +143,26 @@ function EditModal({ sub, onClose, onSaved }: { sub: Sub; onClose: () => void; o
       });
       const data = await res.json();
       if (data.success) { onSaved(); onClose(); }
-      else setError(data.error ?? 'Error');
-    } catch { setError('Error'); }
+      else setError(data.error ?? tCommon('error'));
+    } catch { setError(tCommon('error')); }
     finally { setLoading(false); }
   }
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">Edit Subscription</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">{tAdmin('subscriptions')} — {tCommon('edit')}</h2>
         <p className="text-sm text-gray-500 mb-4">{sub.vendor.title ?? sub.vendor.uid}</p>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('plan')}</label>
             <select value={planId} onChange={(e) => setPlanId(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
               {PLAN_OPTIONS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{tCommon('status')}</label>
             <select value={status} onChange={(e) => setStatus(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
               {['active', 'expired', 'cancelled', 'pending'].map((s) => (
@@ -167,12 +172,12 @@ function EditModal({ sub, onClose, onSaved }: { sub: Sub; onClose: () => void; o
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Starts At</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('startsAt')}</label>
               <input type="date" value={startsAt} onChange={(e) => setStartsAt(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ends At</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('endsAt')}</label>
               <input type="date" value={endsAt} onChange={(e) => setEndsAt(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
@@ -181,11 +186,11 @@ function EditModal({ sub, onClose, onSaved }: { sub: Sub; onClose: () => void; o
           <div className="flex gap-2 pt-2">
             <button type="submit" disabled={loading}
               className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">
-              {loading ? 'Saving...' : 'Save'}
+              {loading ? tCommon('saving') : tCommon('save')}
             </button>
             <button type="button" onClick={onClose}
               className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
-              Cancel
+              {tCommon('cancel')}
             </button>
           </div>
         </form>
@@ -196,6 +201,8 @@ function EditModal({ sub, onClose, onSaved }: { sub: Sub; onClose: () => void; o
 }
 
 export default function AdminSubscriptionsPage() {
+  const tAdmin = useTranslations('admin');
+  const tCommon = useTranslations('common');
   const [subscriptions, setSubscriptions] = useState<Sub[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -224,13 +231,13 @@ export default function AdminSubscriptionsPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this subscription? This cannot be undone.')) return;
+    if (!confirm(tAdmin('deleteSubscriptionConfirm'))) return;
     try {
       const res = await fetch(`/api/admin/subscriptions?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) fetchData();
-      else alert(data.error ?? 'Error');
-    } catch { alert('Error'); }
+      else alert(data.error ?? tCommon('error'));
+    } catch { alert(tCommon('error')); }
   }
 
   function handleSearch(e: React.FormEvent) {
@@ -246,12 +253,12 @@ export default function AdminSubscriptionsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
-        <h1 className="text-[40px] font-normal leading-none tracking-tight text-emerald-950">Subscriptions</h1>
+        <h1 className="text-[40px] font-normal leading-none tracking-tight text-emerald-950">{tAdmin('subscriptions')}</h1>
         <button
           onClick={() => setShowAdd(true)}
           className="rounded-md border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
         >
-          Add Subscription
+          {tAdmin('addSubscription')}
         </button>
       </div>
 
@@ -259,7 +266,7 @@ export default function AdminSubscriptionsPage() {
         {/* Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 px-4 py-4">
           <div className="flex items-center gap-2 text-sm text-slate-600">
-            <span>Show</span>
+            <span>{tCommon('show')}</span>
             <select
               value={limit}
               onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
@@ -267,24 +274,24 @@ export default function AdminSubscriptionsPage() {
             >
               {PAGE_LIMITS.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
-            <span>results</span>
+            <span>{tCommon('results')}</span>
           </div>
           <form onSubmit={handleSearch} className="flex items-center gap-2">
-            <span className="text-sm text-slate-600">Search vendor:</span>
+            <span className="text-sm text-slate-600">{tAdmin('searchVendor')}:</span>
             <input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               className="w-[200px] rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
-              placeholder="Vendor name..."
+              placeholder={tAdmin('vendorTitle') + '...'}
             />
             <button type="submit"
               className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-              Search
+              {tCommon('search')}
             </button>
             {search && (
               <button type="button" onClick={() => { setSearchInput(''); setSearch(''); setPage(1); }}
                 className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50">
-                Clear
+                {tCommon('filter')}
               </button>
             )}
           </form>
@@ -295,31 +302,31 @@ export default function AdminSubscriptionsPage() {
           <table className="min-w-[860px] w-full border-collapse text-[13px] text-slate-600">
             <thead>
               <tr className="border-b border-emerald-100 bg-emerald-50/50 text-[11px] uppercase tracking-[0.12em] text-slate-600">
-                <th className="px-3 py-2 text-start font-semibold">Vendor</th>
-                <th className="px-3 py-2 text-start font-semibold">Plan</th>
-                <th className="px-3 py-2 text-start font-semibold">Billing</th>
-                <th className="px-3 py-2 text-start font-semibold">Status</th>
-                <th className="px-3 py-2 text-start font-semibold">Starts</th>
-                <th className="px-3 py-2 text-start font-semibold">Ends</th>
-                <th className="px-3 py-2 text-start font-semibold">Actions</th>
+                <th className="px-3 py-2 text-start font-semibold">{tAdmin('vendor')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tAdmin('plan')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tAdmin('billing')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tCommon('status')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tAdmin('starts')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tAdmin('ends')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tCommon('actions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-sm text-slate-400">Loading...</td>
+                  <td colSpan={7} className="px-3 py-8 text-center text-sm text-slate-400">{tCommon('loading')}</td>
                 </tr>
               )}
               {!loading && subscriptions.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-sm text-slate-500">No subscriptions found.</td>
+                  <td colSpan={7} className="px-3 py-8 text-center text-sm text-slate-500">{tAdmin('noSubscriptions')}</td>
                 </tr>
               )}
               {!loading && subscriptions.map((sub) => (
                 <tr key={sub.id} className="border-b border-emerald-50 bg-white hover:bg-emerald-50/30">
                   <td className="px-3 py-2 font-medium text-emerald-800">{sub.vendor.title ?? sub.vendor.slug ?? sub.vendor.uid}</td>
                   <td className="px-3 py-2">{planLabel(sub.planId)}</td>
-                  <td className="px-3 py-2">{billingCycleLabel(sub)}</td>
+                  <td className="px-3 py-2">{billingCycleLabel(sub, tAdmin)}</td>
                   <td className="px-3 py-2">
                     <span className={`inline-flex rounded px-2 py-0.5 text-[11px] font-semibold capitalize ${statusBadge(sub.status)}`}>
                       {sub.status}
@@ -333,13 +340,13 @@ export default function AdminSubscriptionsPage() {
                         onClick={() => setEditSub(sub)}
                         className="rounded bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
                       >
-                        Edit
+                        {tCommon('edit')}
                       </button>
                       <button
                         onClick={() => handleDelete(sub.id)}
                         className="rounded bg-rose-500 px-2 py-1 text-[11px] font-semibold text-white hover:bg-rose-600"
                       >
-                        Delete
+                        {tCommon('delete')}
                       </button>
                     </div>
                   </td>
@@ -351,14 +358,14 @@ export default function AdminSubscriptionsPage() {
 
         {/* Pagination */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-emerald-100 px-4 py-3 text-sm text-slate-500">
-          <div>Showing {start} to {end} of {total} entries</div>
+          <div>{tAdmin('showing', { start, end, total })}</div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
               className={`rounded border px-3 py-1.5 text-xs font-semibold ${page > 1 ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50' : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'}`}
             >
-              Previous
+              {tCommon('previous')}
             </button>
             <span className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white">{page}</span>
             <button
@@ -366,7 +373,7 @@ export default function AdminSubscriptionsPage() {
               disabled={page >= totalPages}
               className={`rounded border px-3 py-1.5 text-xs font-semibold ${page < totalPages ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50' : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'}`}
             >
-              Next
+              {tCommon('next')}
             </button>
           </div>
         </div>

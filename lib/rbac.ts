@@ -1,12 +1,14 @@
 import type { Session } from 'next-auth';
 import prisma from '@/lib/prisma';
-import { USER_ROLES } from '@/lib/constants';
+import { USER_ROLES, type VendorPermission } from '@/lib/constants';
 
 export type AppActor = {
   userId: string;
   roleId: number;
   vendorId: string | null;
   permissions: string[];
+  permissionsRestricted: boolean;
+  planDisabledPerms: string[];
 };
 
 export function getActorFromSession(session: Session | null): AppActor | null {
@@ -15,6 +17,8 @@ export function getActorFromSession(session: Session | null): AppActor | null {
     roleId?: number;
     vendorId?: string | null;
     permissions?: string[];
+    permissionsRestricted?: boolean;
+    planDisabledPerms?: string[];
   };
   if (typeof sessionUser.roleId !== 'number') return null;
 
@@ -23,6 +27,8 @@ export function getActorFromSession(session: Session | null): AppActor | null {
     roleId: sessionUser.roleId,
     vendorId: sessionUser.vendorId ?? null,
     permissions: Array.isArray(sessionUser.permissions) ? sessionUser.permissions : [],
+    permissionsRestricted: Boolean(sessionUser.permissionsRestricted),
+    planDisabledPerms: Array.isArray(sessionUser.planDisabledPerms) ? sessionUser.planDisabledPerms : [],
   };
 }
 
@@ -36,6 +42,22 @@ export function isVendorAdmin(actor: AppActor): boolean {
 
 export function isVendorEmployee(actor: AppActor): boolean {
   return actor.roleId === USER_ROLES.VENDOR_USER;
+}
+
+export function hasVendorPermission(actor: AppActor, permission: VendorPermission): boolean {
+  if (isSuperAdmin(actor)) return true;
+  if (actor.planDisabledPerms.includes(permission)) return false;
+
+  if (isVendorAdmin(actor)) {
+    if (!actor.permissionsRestricted) return true;
+    return actor.permissions.includes(permission);
+  }
+
+  if (isVendorEmployee(actor)) {
+    return actor.permissions.includes(permission);
+  }
+
+  return false;
 }
 
 function normalizeVendorId(vendorId: string | null | undefined): string | undefined {

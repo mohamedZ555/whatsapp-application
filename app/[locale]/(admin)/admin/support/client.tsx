@@ -45,6 +45,7 @@ export default function AdminSupportClient({
   limit: number;
   statusFilter: string;
 }) {
+  const tAdmin = useTranslations('admin');
   const tCommon = useTranslations('common');
   const [tickets, setTickets] = useState(initialTickets);
   const [selected, setSelected] = useState<Ticket | null>(null);
@@ -101,14 +102,23 @@ export default function AdminSupportClient({
     }
   };
 
+  const statusLabel = (s: string) => {
+    if (s === '') return tAdmin('statusAll');
+    if (s === 'open') return tCommon('open');
+    if (s === 'in_progress') return 'In Progress';
+    if (s === 'resolved') return 'Resolved';
+    if (s === 'closed') return tCommon('close');
+    return s;
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
         <h1 className="text-[40px] font-normal leading-none tracking-tight text-emerald-950">
-          Support Tickets
+          {tAdmin('supportTickets')}
         </h1>
         <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">
-          {total} ticket{total !== 1 ? 's' : ''}
+          {total}
         </span>
       </div>
 
@@ -124,7 +134,7 @@ export default function AdminSupportClient({
                 : 'border border-slate-200 bg-white text-slate-600 hover:bg-emerald-50'
             }`}
           >
-            {s === '' ? 'All' : s.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+            {statusLabel(s)}
           </Link>
         ))}
       </div>
@@ -134,7 +144,7 @@ export default function AdminSupportClient({
         <div className="lg:col-span-2 space-y-2">
           {tickets.length === 0 && (
             <div className="rounded-xl border border-gray-100 bg-white p-6 text-center text-sm text-slate-400">
-              No tickets found.
+              {tAdmin('noTickets')}
             </div>
           )}
           {tickets.map((ticket) => (
@@ -187,7 +197,7 @@ export default function AdminSupportClient({
               {tCommon('previous')}
             </Link>
             <span className="text-xs text-gray-500">
-              Page {page} / {totalPages}
+              {tCommon('page')} {page} / {totalPages}
             </span>
             <Link
               href={`/admin/support?status=${statusFilter}&page=${Math.min(totalPages, page + 1)}`}
@@ -207,7 +217,7 @@ export default function AdminSupportClient({
         <div className="lg:col-span-3">
           {!selected ? (
             <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white text-sm text-gray-400">
-              Select a ticket to view
+              {tAdmin('selectTicket')}
             </div>
           ) : (
             <div
@@ -221,7 +231,7 @@ export default function AdminSupportClient({
                     <h2 className="font-bold text-gray-900">{selected.subject}</h2>
                     <p className="mt-0.5 text-xs text-gray-500">
                       {selected.vendor.title ?? selected.vendor.uid} &middot; #
-                      {selected.uid.slice(0, 8)} &middot; Priority:{' '}
+                      {selected.uid.slice(0, 8)} &middot; {tAdmin('priorityLabel')}:{' '}
                       <span className="capitalize">{selected.priority}</span>
                     </p>
                   </div>
@@ -231,10 +241,10 @@ export default function AdminSupportClient({
                     disabled={changingStatus}
                     className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 outline-none focus:border-emerald-400"
                   >
-                    <option value="open">Open</option>
+                    <option value="open">{tCommon('open')}</option>
                     <option value="in_progress">In Progress</option>
                     <option value="resolved">Resolved</option>
-                    <option value="closed">Closed</option>
+                    <option value="closed">{tCommon('close')}</option>
                   </select>
                 </div>
               </div>
@@ -271,7 +281,7 @@ export default function AdminSupportClient({
                     rows={3}
                     value={reply}
                     onChange={(e) => setReply(e.target.value)}
-                    placeholder="Type your reply..."
+                    placeholder={tAdmin('typeReply')}
                     className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                   />
                   <div className="mt-2 flex justify-end">
@@ -280,13 +290,13 @@ export default function AdminSupportClient({
                       disabled={sending || !reply.trim()}
                       className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
                     >
-                      {sending ? 'Sending...' : 'Send Reply'}
+                      {sending ? tAdmin('sending') : tAdmin('sendReply')}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="border-t border-gray-100 px-5 py-3 text-center text-xs text-gray-400">
-                  This ticket is closed.
+                  {tAdmin('ticketClosed')}
                 </div>
               )}
             </div>

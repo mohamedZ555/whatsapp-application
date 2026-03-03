@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 
 type Reply = { id: string; content: string; isAdmin: boolean; createdAt: Date };
@@ -39,6 +39,9 @@ export default function VendorSupportClient({
   limit: number;
 }) {
   const tCommon = useTranslations('common');
+  const locale = useLocale();
+  const isArabic = locale === 'ar';
+  const tr = (en: string, ar: string) => (isArabic ? ar : en);
   const [tickets, setTickets] = useState(initialTickets);
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [view, setView] = useState<'list' | 'new'>('list');
@@ -61,7 +64,7 @@ export default function VendorSupportClient({
         body: JSON.stringify(newForm),
       });
       const data = await res.json();
-      if (!res.ok) { alert(data.error ?? 'Error'); return; }
+      if (!res.ok) { alert(data.error ?? tr('Error', 'خطأ')); return; }
       setTickets((prev) => [data.ticket, ...prev]);
       setSelected(data.ticket);
       setView('list');
@@ -93,31 +96,31 @@ export default function VendorSupportClient({
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Support</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{tr('Support', 'الدعم')}</h1>
         <button
           onClick={() => { setView('new'); setSelected(null); }}
           className="rounded-xl bg-green-500 px-4 py-2 text-sm font-semibold text-white hover:bg-green-600"
         >
-          + New Ticket
+          {tr('+ New Ticket', '+ تذكرة جديدة')}
         </button>
       </div>
 
       {view === 'new' ? (
         <div className="max-w-2xl rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-5 text-lg font-semibold text-gray-900">Open New Support Ticket</h2>
+          <h2 className="mb-5 text-lg font-semibold text-gray-900">{tr('Open New Support Ticket', 'فتح تذكرة دعم جديدة')}</h2>
           <form onSubmit={handleCreateTicket} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Subject</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">{tr('Subject', 'الموضوع')}</label>
               <input
                 required
                 value={newForm.subject}
                 onChange={(e) => setNewForm({ ...newForm, subject: e.target.value })}
-                placeholder="Brief description of your issue"
+                placeholder={tr('Brief description of your issue', 'وصف مختصر للمشكلة')}
                 className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Priority</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">{tr('Priority', 'الأولوية')}</label>
               <select
                 value={newForm.priority}
                 onChange={(e) => setNewForm({ ...newForm, priority: e.target.value })}
@@ -125,19 +128,27 @@ export default function VendorSupportClient({
               >
                 {PRIORITIES.map((p) => (
                   <option key={p} value={p}>
-                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                    {isArabic
+                      ? p === 'low'
+                        ? 'منخفض'
+                        : p === 'normal'
+                          ? 'عادية'
+                          : p === 'high'
+                            ? 'مرتفعة'
+                            : 'عاجلة'
+                      : p.charAt(0).toUpperCase() + p.slice(1)}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Message</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">{tr('Message', 'الرسالة')}</label>
               <textarea
                 required
                 rows={6}
                 value={newForm.message}
                 onChange={(e) => setNewForm({ ...newForm, message: e.target.value })}
-                placeholder="Describe your issue in detail..."
+                placeholder={tr('Describe your issue in detail...', 'اشرح مشكلتك بالتفصيل...')}
                 className="w-full resize-none rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
               />
             </div>
@@ -154,7 +165,7 @@ export default function VendorSupportClient({
                 disabled={creating}
                 className="rounded-xl bg-green-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-60"
               >
-                {creating ? 'Submitting...' : 'Submit Ticket'}
+                {creating ? tr('Submitting...', 'جارٍ الإرسال...') : tr('Submit Ticket', 'إرسال التذكرة')}
               </button>
             </div>
           </form>
@@ -165,12 +176,12 @@ export default function VendorSupportClient({
           <div className="lg:col-span-2 space-y-2">
             {tickets.length === 0 && (
               <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center">
-                <p className="text-sm text-gray-400">No support tickets yet.</p>
+                <p className="text-sm text-gray-400">{tr('No support tickets yet.', 'لا توجد تذاكر دعم بعد.')}</p>
                 <button
                   onClick={() => setView('new')}
                   className="mt-3 text-sm font-medium text-green-600 hover:underline"
                 >
-                  Open your first ticket →
+                  {tr('Open your first ticket', 'افتح أول تذكرة')}
                 </button>
               </div>
             )}
@@ -236,7 +247,7 @@ export default function VendorSupportClient({
           <div className="lg:col-span-3">
             {!selected ? (
               <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white text-sm text-gray-400">
-                Select a ticket to view conversation
+                {tr('Select a ticket to view conversation', 'اختر تذكرة لعرض المحادثة')}
               </div>
             ) : (
               <div
@@ -249,7 +260,7 @@ export default function VendorSupportClient({
                     <div>
                       <h2 className="font-bold text-gray-900">{selected.subject}</h2>
                       <p className="mt-0.5 text-xs text-gray-400">
-                        #{selected.uid.slice(0, 8)} &middot; Priority:{' '}
+                        #{selected.uid.slice(0, 8)} &middot; {tr('Priority', 'الأولوية')}:{' '}
                         <span className="capitalize">{selected.priority}</span>
                       </p>
                     </div>
@@ -276,7 +287,7 @@ export default function VendorSupportClient({
                         }`}
                       >
                         {r.isAdmin && (
-                          <p className="mb-1 text-xs font-semibold text-gray-500">Support Team</p>
+                          <p className="mb-1 text-xs font-semibold text-gray-500">{tr('Support Team', 'فريق الدعم')}</p>
                         )}
                         <p className="whitespace-pre-wrap">{r.content}</p>
                         <p
@@ -298,7 +309,7 @@ export default function VendorSupportClient({
                       rows={3}
                       value={reply}
                       onChange={(e) => setReply(e.target.value)}
-                      placeholder="Add a reply..."
+                      placeholder={tr('Add a reply...', 'أضف ردًا...')}
                       className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
                     />
                     <div className="mt-2 flex justify-end">
@@ -307,13 +318,13 @@ export default function VendorSupportClient({
                         disabled={sending || !reply.trim()}
                         className="rounded-xl bg-green-500 px-5 py-2 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-60"
                       >
-                        {sending ? 'Sending...' : 'Send Reply'}
+                        {sending ? tr('Sending...', 'جارٍ الإرسال...') : tr('Send Reply', 'إرسال الرد')}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div className="border-t border-gray-100 px-5 py-3 text-center text-xs text-gray-400">
-                    This ticket is {selected.status}.
+                    {tr('This ticket is', 'هذه التذكرة')} {selected.status}.
                   </div>
                 )}
               </div>

@@ -9,12 +9,14 @@ import { checkLimit } from "@/lib/permissions";
 import {
   canManageVendorUsers,
   getActorFromSession,
+  hasVendorPermission,
   isSuperAdmin,
   isVendorAdmin,
   resolveOptionalVendorFilter,
   resolveRequiredVendorId,
   shouldBypassPlanLimits,
 } from "@/lib/rbac";
+import { getPlanDisabledPermsForVendor } from "@/lib/permissions";
 
 function normalizeString(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -49,6 +51,9 @@ export async function GET(req: NextRequest) {
   if (!actor)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isSuperAdmin(actor) && !isVendorAdmin(actor)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (isVendorAdmin(actor) && !hasVendorPermission(actor, "manage_users")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -123,6 +128,9 @@ export async function POST(req: NextRequest) {
   }
 
   if (!isSuperAdmin(actor) && !isVendorAdmin(actor)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (isVendorAdmin(actor) && !hasVendorPermission(actor, "manage_users")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -243,6 +251,9 @@ export async function PUT(req: NextRequest) {
   if (!actor)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isSuperAdmin(actor) && !isVendorAdmin(actor)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (isVendorAdmin(actor) && !hasVendorPermission(actor, "manage_users")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -435,25 +446,42 @@ export async function PUT(req: NextRequest) {
       nextRoleId === USER_ROLES.VENDOR) &&
     nextVendorId
   ) {
+    // ── Plan-disabled perms enforcement for ADMIN (VENDOR) ────────────────
+    // Strip any plan-disabled permissions before saving
+    let effectivePermissions = permissions;
+    if (
+      nextRoleId === USER_ROLES.VENDOR &&
+      effectivePermissions &&
+      nextVendorId
+    ) {
+      const planDisabledPerms =
+        await getPlanDisabledPermsForVendor(nextVendorId);
+      if (planDisabledPerms.length > 0) {
+        effectivePermissions = effectivePermissions.filter(
+          (p) => !planDisabledPerms.includes(p),
+        );
+      }
+    }
+
     await prisma.vendorUser.upsert({
       where: { userId: target.id },
       update: {
         vendorId: nextVendorId,
-        ...(permissions ? { permissions } : {}),
+        ...(effectivePermissions ? { permissions: effectivePermissions } : {}),
         ...(jobCategoryId !== undefined ? { jobCategoryId } : {}),
       },
       create: {
         userId: target.id,
         vendorId: nextVendorId,
-        permissions: permissions ?? [],
+        permissions: effectivePermissions ?? [],
         jobCategoryId: typeof jobCategoryId === "string" ? jobCategoryId : null,
       },
     });
 
     // ── Cascade permission removal to employees when admin permissions change ──
     // If we just updated an ADMIN's permissions, cascade removals down to employees.
-    if (nextRoleId === USER_ROLES.VENDOR && permissions) {
-      const adminPerms = permissions;
+    if (nextRoleId === USER_ROLES.VENDOR && effectivePermissions) {
+      const adminPerms = effectivePermissions;
 
       // Get all employees in this vendor
       const employeeVendorUsers = await prisma.vendorUser.findMany({
@@ -498,6 +526,9 @@ export async function DELETE(req: NextRequest) {
   if (!actor)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isSuperAdmin(actor) && !isVendorAdmin(actor)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (isVendorAdmin(actor) && !hasVendorPermission(actor, "manage_users")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

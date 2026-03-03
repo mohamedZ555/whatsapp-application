@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { getActorFromSession, isSuperAdmin, isVendorAdmin, resolveRequiredVendorId } from '@/lib/rbac';
+import { getActorFromSession, hasVendorPermission, isSuperAdmin, isVendorAdmin, resolveRequiredVendorId } from '@/lib/rbac';
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const actor = getActorFromSession(session);
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (isVendorAdmin(actor) && !hasVendorPermission(actor, 'manage_users')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const { searchParams } = new URL(req.url);
   const vendorIdParam = searchParams.get('vendorId') ?? undefined;
@@ -36,6 +39,9 @@ export async function POST(req: NextRequest) {
   if (!isVendorAdmin(actor) && !isSuperAdmin(actor)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+  if (isVendorAdmin(actor) && !hasVendorPermission(actor, 'manage_users')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const body = await req.json();
   const vendorId = resolveRequiredVendorId(actor, body.vendorId);
@@ -61,6 +67,9 @@ export async function PUT(req: NextRequest) {
   const actor = getActorFromSession(session);
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!isVendorAdmin(actor) && !isSuperAdmin(actor)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  if (isVendorAdmin(actor) && !hasVendorPermission(actor, 'manage_users')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -91,6 +100,9 @@ export async function DELETE(req: NextRequest) {
   const actor = getActorFromSession(session);
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!isVendorAdmin(actor) && !isSuperAdmin(actor)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  if (isVendorAdmin(actor) && !hasVendorPermission(actor, 'manage_users')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

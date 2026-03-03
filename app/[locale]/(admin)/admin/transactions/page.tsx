@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslations } from 'next-intl';
 
 const PAGE_LIMITS = [10, 25, 50, 100] as const;
 
@@ -41,6 +42,8 @@ function typeBadge(type: string) {
 }
 
 function AddTransactionModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const tAdmin = useTranslations('admin');
+  const tCommon = useTranslations('common');
   const [vendors, setVendors] = useState<Array<{ id: string; title: string | null; uid: string }>>([]);
   const [vendorId, setVendorId] = useState('');
   const [type, setType] = useState('manual');
@@ -72,18 +75,18 @@ function AddTransactionModal({ onClose, onCreated }: { onClose: () => void; onCr
       });
       const data = await res.json();
       if (data.success) { onCreated(); onClose(); }
-      else setError(data.error ?? 'Error');
-    } catch { setError('Error'); }
+      else setError(data.error ?? tCommon('error'));
+    } catch { setError(tCommon('error')); }
     finally { setLoading(false); }
   }
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Add Transaction</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">{tAdmin('addTransaction')}</h2>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('vendor')}</label>
             <select value={vendorId} onChange={(e) => setVendorId(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" required>
               {vendors.map((v) => (
@@ -93,7 +96,7 @@ function AddTransactionModal({ onClose, onCreated }: { onClose: () => void; onCr
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('type')}</label>
               <select value={type} onChange={(e) => setType(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 {['subscription', 'manual', 'refund', 'credit', 'debit'].map((t) => (
@@ -102,7 +105,7 @@ function AddTransactionModal({ onClose, onCreated }: { onClose: () => void; onCr
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tCommon('status')}</label>
               <select value={status} onChange={(e) => setStatus(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 {['pending', 'completed', 'failed', 'refunded'].map((s) => (
@@ -113,30 +116,30 @@ function AddTransactionModal({ onClose, onCreated }: { onClose: () => void; onCr
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('amount')}</label>
               <input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" required placeholder="0.00" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('currency')}</label>
               <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" maxLength={3} placeholder="USD" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('description')}</label>
             <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Optional note..." />
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
           {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>}
           <div className="flex gap-2 pt-2">
             <button type="submit" disabled={loading}
               className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">
-              {loading ? 'Creating...' : 'Create'}
+              {loading ? tAdmin('creating') : tCommon('create')}
             </button>
             <button type="button" onClick={onClose}
               className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
-              Cancel
+              {tCommon('cancel')}
             </button>
           </div>
         </form>
@@ -147,6 +150,8 @@ function AddTransactionModal({ onClose, onCreated }: { onClose: () => void; onCr
 }
 
 function EditModal({ tx, onClose, onSaved }: { tx: Transaction; onClose: () => void; onSaved: () => void }) {
+  const tAdmin = useTranslations('admin');
+  const tCommon = useTranslations('common');
   const [status, setStatus] = useState(tx.status);
   const [description, setDescription] = useState(tx.description ?? '');
   const [amount, setAmount] = useState(String(tx.amount));
@@ -166,19 +171,19 @@ function EditModal({ tx, onClose, onSaved }: { tx: Transaction; onClose: () => v
       });
       const data = await res.json();
       if (data.success) { onSaved(); onClose(); }
-      else setError(data.error ?? 'Error');
-    } catch { setError('Error'); }
+      else setError(data.error ?? tCommon('error'));
+    } catch { setError(tCommon('error')); }
     finally { setLoading(false); }
   }
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">Edit Transaction</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">{tAdmin('transactions')} — {tCommon('edit')}</h2>
         <p className="text-sm text-gray-500 mb-4">{tx.vendor.title ?? tx.vendor.uid}</p>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{tCommon('status')}</label>
             <select value={status} onChange={(e) => setStatus(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
               {['pending', 'completed', 'failed', 'refunded'].map((s) => (
@@ -188,18 +193,18 @@ function EditModal({ tx, onClose, onSaved }: { tx: Transaction; onClose: () => v
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('amount')}</label>
               <input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('currency')}</label>
               <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" maxLength={3} />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{tAdmin('description')}</label>
             <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
@@ -207,11 +212,11 @@ function EditModal({ tx, onClose, onSaved }: { tx: Transaction; onClose: () => v
           <div className="flex gap-2 pt-2">
             <button type="submit" disabled={loading}
               className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">
-              {loading ? 'Saving...' : 'Save'}
+              {loading ? tCommon('saving') : tCommon('save')}
             </button>
             <button type="button" onClick={onClose}
               className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
-              Cancel
+              {tCommon('cancel')}
             </button>
           </div>
         </form>
@@ -222,6 +227,8 @@ function EditModal({ tx, onClose, onSaved }: { tx: Transaction; onClose: () => v
 }
 
 export default function AdminTransactionsPage() {
+  const tAdmin = useTranslations('admin');
+  const tCommon = useTranslations('common');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -262,13 +269,13 @@ export default function AdminTransactionsPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this transaction? This cannot be undone.')) return;
+    if (!confirm(tAdmin('deleteTransactionConfirm'))) return;
     try {
       const res = await fetch(`/api/admin/transactions?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) fetchData();
-      else alert(data.error ?? 'Delete failed');
-    } catch (err) { alert('Network error: ' + String(err)); }
+      else alert(data.error ?? tCommon('error'));
+    } catch (err) { alert(tCommon('error') + ': ' + String(err)); }
   }
 
   function handlePeriod(p: string) {
@@ -293,34 +300,39 @@ export default function AdminTransactionsPage() {
   const start = total === 0 ? 0 : (page - 1) * limit + 1;
   const end = Math.min(total, page * limit);
 
-  // Summary stats
   const totalAmount = transactions.reduce((sum, tx) => tx.status === 'completed' ? sum + tx.amount : sum, 0);
+
+  const periodLabels: Record<string, string> = {
+    week: tAdmin('thisWeek'),
+    month: tAdmin('thisMonth'),
+    year: tAdmin('thisYear'),
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
-        <h1 className="text-[40px] font-normal leading-none tracking-tight text-emerald-950">Transactions</h1>
+        <h1 className="text-[40px] font-normal leading-none tracking-tight text-emerald-950">{tAdmin('transactions')}</h1>
         <button
           onClick={() => setShowAdd(true)}
           className="rounded-md border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
         >
-          Add Transaction
+          {tAdmin('addTransaction')}
         </button>
       </div>
 
       {/* Summary card */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
-          <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Total (this page)</p>
+          <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">{tAdmin('totalThisPage')}</p>
           <p className="mt-1 text-2xl font-bold text-emerald-700">${totalAmount.toFixed(2)}</p>
-          <p className="text-xs text-slate-400 mt-0.5">completed only</p>
+          <p className="text-xs text-slate-400 mt-0.5">{tAdmin('completedOnly')}</p>
         </div>
         <div className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
-          <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Total Records</p>
+          <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">{tAdmin('totalRecords')}</p>
           <p className="mt-1 text-2xl font-bold text-slate-800">{total}</p>
         </div>
         <div className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
-          <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Page</p>
+          <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">{tCommon('page')}</p>
           <p className="mt-1 text-2xl font-bold text-slate-800">{page} / {totalPages}</p>
         </div>
       </div>
@@ -331,7 +343,7 @@ export default function AdminTransactionsPage() {
           {/* Row 1: basic filters + search */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-              <span>Show</span>
+              <span>{tCommon('show')}</span>
               <select
                 value={limit}
                 onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
@@ -344,7 +356,7 @@ export default function AdminTransactionsPage() {
                 onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
                 className="rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
               >
-                <option value="">All Statuses</option>
+                <option value="">{tAdmin('allStatuses')}</option>
                 {['pending', 'completed', 'failed', 'refunded'].map((s) => (
                   <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                 ))}
@@ -354,28 +366,28 @@ export default function AdminTransactionsPage() {
                 onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
                 className="rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
               >
-                <option value="">All Types</option>
+                <option value="">{tAdmin('allTypes')}</option>
                 {['subscription', 'manual', 'refund', 'credit', 'debit'].map((t) => (
                   <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
                 ))}
               </select>
             </div>
             <form onSubmit={handleSearch} className="flex items-center gap-2">
-              <span className="text-sm text-slate-600">Search vendor:</span>
+              <span className="text-sm text-slate-600">{tAdmin('searchVendor')}:</span>
               <input
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="w-[200px] rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
-                placeholder="Vendor name..."
+                placeholder={tAdmin('vendorTitle') + '...'}
               />
               <button type="submit"
                 className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                Search
+                {tCommon('search')}
               </button>
               {search && (
                 <button type="button" onClick={() => { setSearchInput(''); setSearch(''); setPage(1); }}
                   className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50">
-                  Clear
+                  {tCommon('filter')}
                 </button>
               )}
             </form>
@@ -383,7 +395,7 @@ export default function AdminTransactionsPage() {
 
           {/* Row 2: date filters */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Period:</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{tAdmin('period')}:</span>
             {(['week', 'month', 'year'] as const).map((p) => (
               <button
                 key={p}
@@ -394,18 +406,18 @@ export default function AdminTransactionsPage() {
                     : 'bg-white text-slate-600 border-slate-300 hover:bg-emerald-50'
                 }`}
               >
-                This {p.charAt(0).toUpperCase() + p.slice(1)}
+                {periodLabels[p]}
               </button>
             ))}
             <span className="text-slate-300 mx-1">|</span>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Custom:</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{tAdmin('custom')}:</span>
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => { setDateFrom(e.target.value); handleDateRange(); }}
               className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700"
             />
-            <span className="text-xs text-slate-400">to</span>
+            <span className="text-xs text-slate-400">{tAdmin('to')}</span>
             <input
               type="date"
               value={dateTo}
@@ -417,7 +429,7 @@ export default function AdminTransactionsPage() {
                 onClick={() => { setPeriod(''); setDateFrom(''); setDateTo(''); setPage(1); }}
                 className="rounded px-2.5 py-1 text-xs font-semibold border border-slate-300 bg-white text-slate-500 hover:bg-slate-50"
               >
-                Clear dates
+                {tAdmin('clearDates')}
               </button>
             )}
           </div>
@@ -428,31 +440,31 @@ export default function AdminTransactionsPage() {
           <table className="min-w-[900px] w-full border-collapse text-[13px] text-slate-600">
             <thead>
               <tr className="border-b border-emerald-100 bg-emerald-50/50 text-[11px] uppercase tracking-[0.12em] text-slate-600">
-                <th className="px-3 py-2 text-start font-semibold">Date</th>
-                <th className="px-3 py-2 text-start font-semibold">Vendor</th>
-                <th className="px-3 py-2 text-start font-semibold">Type</th>
-                <th className="px-3 py-2 text-start font-semibold">Description</th>
-                <th className="px-3 py-2 text-start font-semibold">Plan</th>
-                <th className="px-3 py-2 text-start font-semibold">Amount</th>
-                <th className="px-3 py-2 text-start font-semibold">Status</th>
-                <th className="px-3 py-2 text-start font-semibold">Actions</th>
+                <th className="px-3 py-2 text-start font-semibold">{tAdmin('date')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tAdmin('vendor')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tAdmin('type')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tAdmin('description')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tAdmin('plan')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tAdmin('amount')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tCommon('status')}</th>
+                <th className="px-3 py-2 text-start font-semibold">{tCommon('actions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-sm text-slate-400">Loading...</td>
+                  <td colSpan={8} className="px-3 py-8 text-center text-sm text-slate-400">{tCommon('loading')}</td>
                 </tr>
               )}
               {!loading && transactions.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-sm text-slate-500">No transactions found.</td>
+                  <td colSpan={8} className="px-3 py-8 text-center text-sm text-slate-500">{tAdmin('noTransactions')}</td>
                 </tr>
               )}
               {!loading && transactions.map((tx) => (
                 <tr key={tx.id} className="border-b border-emerald-50 bg-white hover:bg-emerald-50/30">
                   <td className="px-3 py-2 text-slate-500 whitespace-nowrap">
-                    {new Date(tx.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {new Date(tx.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-3 py-2 font-medium text-emerald-800">{tx.vendor.title ?? tx.vendor.slug ?? tx.vendor.uid}</td>
                   <td className="px-3 py-2">
@@ -478,13 +490,13 @@ export default function AdminTransactionsPage() {
                         onClick={() => setEditTx(tx)}
                         className="rounded bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
                       >
-                        Edit
+                        {tCommon('edit')}
                       </button>
                       <button
                         onClick={() => handleDelete(tx.id)}
                         className="rounded bg-rose-500 px-2 py-1 text-[11px] font-semibold text-white hover:bg-rose-600"
                       >
-                        Delete
+                        {tCommon('delete')}
                       </button>
                     </div>
                   </td>
@@ -496,14 +508,14 @@ export default function AdminTransactionsPage() {
 
         {/* Pagination */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-emerald-100 px-4 py-3 text-sm text-slate-500">
-          <div>Showing {start} to {end} of {total} entries</div>
+          <div>{tAdmin('showing', { start, end, total })}</div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
               className={`rounded border px-3 py-1.5 text-xs font-semibold ${page > 1 ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50' : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'}`}
             >
-              Previous
+              {tCommon('previous')}
             </button>
             <span className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white">{page}</span>
             <button
@@ -511,7 +523,7 @@ export default function AdminTransactionsPage() {
               disabled={page >= totalPages}
               className={`rounded border px-3 py-1.5 text-xs font-semibold ${page < totalPages ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50' : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'}`}
             >
-              Next
+              {tCommon('next')}
             </button>
           </div>
         </div>

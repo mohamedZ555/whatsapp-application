@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useLocale } from 'next-intl';
 import type { PlansMap } from '@/lib/plans';
 
 type Props = {
@@ -11,6 +12,9 @@ type Props = {
 };
 
 export function SubscriptionPlanCards({ currentPlanId, currentBillingCycle, endsAt, plans }: Props) {
+  const locale = useLocale();
+  const isArabic = locale === 'ar';
+  const tr = (en: string, ar: string) => (isArabic ? ar : en);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(currentBillingCycle ?? 'monthly');
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -27,7 +31,7 @@ export function SubscriptionPlanCards({ currentPlanId, currentBillingCycle, ends
       });
       const data = await res.json();
       if (data.success) {
-        setFeedback({ type: 'success', message: `Plan changed to ${plans[planId]?.title ?? planId}!` });
+        setFeedback({ type: 'success', message: isArabic ? `تم تغيير الخطة إلى ${plans[planId]?.title ?? planId}!` : `Plan changed to ${plans[planId]?.title ?? planId}!` });
         setTimeout(() => window.location.reload(), 1200);
       } else {
         setFeedback({ type: 'error', message: data.error ?? 'Failed to change plan.' });
@@ -104,7 +108,7 @@ export function SubscriptionPlanCards({ currentPlanId, currentBillingCycle, ends
             >
               {isCurrent && (
                 <div className="mb-2 inline-flex self-start rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                  Current Plan
+              {tr('Current Plan', 'الخطة الحالية')}
                 </div>
               )}
               <h3 className="font-bold text-gray-900 text-lg mb-1">{plan.title}</h3>
@@ -148,10 +152,10 @@ export function SubscriptionPlanCards({ currentPlanId, currentBillingCycle, ends
                     className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                   >
                     {upgrading === plan.id
-                      ? 'Upgrading...'
+                      ? tr('Upgrading...', 'جارٍ الترقية...')
                       : plan.pricing.monthly === 0
-                      ? 'Switch to Free'
-                      : 'Upgrade'}
+                      ? tr('Switch to Free', 'التحويل إلى المجانية')
+                      : tr('Upgrade', 'ترقية')}
                   </button>
                 )}
               </div>

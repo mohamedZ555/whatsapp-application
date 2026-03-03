@@ -7,7 +7,10 @@ declare module 'next-auth' {
       uid: string;
       roleId: number;
       vendorId: string | null;
+      vendorUid: string | null;
       permissions: string[];
+      permissionsRestricted: boolean;
+      planDisabledPerms: string[];
     };
   }
 }

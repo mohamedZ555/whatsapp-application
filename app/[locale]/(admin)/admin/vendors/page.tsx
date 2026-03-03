@@ -15,18 +15,18 @@ type VendorsPageSearchParams = {
   status?: string;
 };
 
-function getVendorStatusBadge(status: number) {
-  if (status === 1) return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-[#e8f4ef] text-[#2f8059]">Active</span>;
-  if (status === 2) return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-700">Pending</span>;
-  if (status === 3) return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-red-100 text-red-700">Banned</span>;
-  return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-[#efefef] text-[#7e8ca3]">Deleted</span>;
+function getVendorStatusBadge(status: number, tAdmin: (k: string) => string) {
+  if (status === 1) return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-[#e8f4ef] text-[#2f8059]">{tAdmin('statusActive')}</span>;
+  if (status === 2) return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-700">{tAdmin('statusPending')}</span>;
+  if (status === 3) return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-red-100 text-red-700">{tAdmin('statusBanned')}</span>;
+  return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-[#efefef] text-[#7e8ca3]">{tAdmin('statusDeleted')}</span>;
 }
 
-function getAdminUserStatusBadge(status: number | undefined) {
-  if (status === 1) return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-[#e8f4ef] text-[#2f8059]">Active</span>;
-  if (status === 4) return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-700">Pending</span>;
-  if (status === 6) return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-red-100 text-red-700">Blocked</span>;
-  return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-[#efefef] text-[#7e8ca3]">Inactive</span>;
+function getAdminUserStatusBadge(status: number | undefined, tAdmin: (k: string) => string) {
+  if (status === 1) return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-[#e8f4ef] text-[#2f8059]">{tAdmin('statusActive')}</span>;
+  if (status === 4) return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-700">{tAdmin('statusPending')}</span>;
+  if (status === 6) return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-red-100 text-red-700">{tAdmin('statusBlocked')}</span>;
+  return <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-[#efefef] text-[#7e8ca3]">{tAdmin('statusInactive')}</span>;
 }
 
 export default async function AdminVendorsPage({
@@ -220,7 +220,7 @@ export default async function AdminVendorsPage({
                     <td className="px-3 py-2">{adminUser?.username ?? tCommon('na')}</td>
                     <td className="px-3 py-2">{adminUser?.email ?? tCommon('na')}</td>
                     <td className="px-3 py-2">
-                      {getVendorStatusBadge(vendor.status)}
+                      {getVendorStatusBadge(vendor.status, tAdmin)}
                     </td>
                     <td className="px-3 py-2">
                       <span className="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold bg-blue-100 text-blue-700">
@@ -229,7 +229,7 @@ export default async function AdminVendorsPage({
                     </td>
                     <td className="px-3 py-2">{adminUser?.mobileNumber ?? tCommon('na')}</td>
                     <td className="px-3 py-2">
-                      {getAdminUserStatusBadge(adminUser?.status)}
+                      {getAdminUserStatusBadge(adminUser?.status, tAdmin)}
                     </td>
                     <td className="px-3 py-2">{createdOn}</td>
                     <VendorActionsWrapper

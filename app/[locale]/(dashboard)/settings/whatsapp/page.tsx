@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useSession } from 'next-auth/react';
-import { Link } from '@/i18n/navigation';
+import SettingsTabs from '@/components/layout/settings-tabs';
 
 type ConnectionStatus = 'idle' | 'checking' | 'connected' | 'not_configured' | 'failed';
 
@@ -17,7 +17,7 @@ export default function SettingsWhatsappPage() {
   const t = useTranslations('settings');
   const tc = useTranslations('common');
   const { data: session } = useSession();
-  const vendorUid = (session?.user as any)?.vendorUid as string | undefined;
+  const vendorUid = (session?.user as { vendorUid?: string } | undefined)?.vendorUid;
 
   const [form, setForm] = useState({
     current_phone_number_id: '',
@@ -28,17 +28,14 @@ export default function SettingsWhatsappPage() {
   const [saved, setSaved] = useState(false);
   const [showToken, setShowToken] = useState(false);
 
-  // Webhook card state
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
   const [verifyToken, setVerifyToken] = useState('');
 
-  // Connection status state
   const [connStatus, setConnStatus] = useState<ConnectionStatus>('idle');
   const [connPhones, setConnPhones] = useState<PhoneInfo[]>([]);
   const [connError, setConnError] = useState('');
 
-  // Setup guide state
   const [guideOpen, setGuideOpen] = useState(false);
 
   const webhookUrl =
@@ -60,12 +57,9 @@ export default function SettingsWhatsappPage() {
 
     fetch('/api/whatsapp/webhook-token')
       .then((r) => r.json())
-      .then((data) => {
-        if (data.verifyToken) setVerifyToken(data.verifyToken);
-      })
+      .then((data) => { if (data.verifyToken) setVerifyToken(data.verifyToken); })
       .catch(() => {});
 
-    // Auto-check connection on load
     checkConnection();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -84,11 +78,11 @@ export default function SettingsWhatsappPage() {
         setConnStatus('not_configured');
       } else {
         setConnStatus('failed');
-        setConnError(data.message ?? 'Connection test failed.');
+        setConnError(data.message ?? t('connectionFailed'));
       }
     } catch {
       setConnStatus('failed');
-      setConnError('Connection test failed.');
+      setConnError(t('connectionFailed'));
     }
   }
 
@@ -128,78 +122,31 @@ export default function SettingsWhatsappPage() {
   }
 
   function statusBadge() {
-    if (connStatus === 'checking') {
-      return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
-          <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-          Checking...
-        </span>
-      );
-    }
-    if (connStatus === 'connected') {
-      return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          Connected
-        </span>
-      );
-    }
-    if (connStatus === 'not_configured') {
-      return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
-          <span className="w-2 h-2 rounded-full bg-yellow-400" />
-          Not Configured
-        </span>
-      );
-    }
-    if (connStatus === 'failed') {
-      return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-          <span className="w-2 h-2 rounded-full bg-red-500" />
-          Connection Failed
-        </span>
-      );
-    }
+    const configs: Record<string, { bg: string; text: string; border: string; dot: string; label: string; pulse?: boolean }> = {
+      checking:      { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', dot: 'bg-yellow-400', label: t('checking'), pulse: true },
+      connected:     { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500', label: t('connected') },
+      not_configured:{ bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', dot: 'bg-yellow-400', label: t('notConfigured') },
+      failed:        { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-500', label: t('connectionFailed') },
+      idle:          { bg: 'bg-gray-50', text: 'text-gray-500', border: 'border-gray-200', dot: 'bg-gray-400', label: t('unknown') },
+    };
+    const cfg = configs[connStatus] ?? configs.idle;
     return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-50 text-gray-500 border border-gray-200">
-        <span className="w-2 h-2 rounded-full bg-gray-400" />
-        Unknown
+      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${cfg.bg} ${cfg.text} border ${cfg.border}`}>
+        <span className={`w-2 h-2 rounded-full ${cfg.dot} ${cfg.pulse ? 'animate-pulse' : ''}`} />
+        {cfg.label}
       </span>
     );
   }
 
   const setupSteps = [
-    { n: 1, text: 'Go to developers.facebook.com → My Apps → Create App → Select "Business" as app type.' },
-    { n: 2, text: 'Inside the app, click "Add Product" and choose WhatsApp.' },
-    { n: 3, text: 'Under WhatsApp → API Setup, note your Phone Number ID and WhatsApp Business Account ID.' },
-    { n: 4, text: 'Generate a Permanent Access Token using a System User or Admin account with full permissions.' },
-    { n: 5, text: 'Under WhatsApp → Configuration → Webhooks, set the Callback URL to your Webhook URL above, and paste the Verify Token.' },
-    { n: 6, text: 'Subscribe to webhook fields: messages, message_deliveries, message_reads.' },
-    { n: 7, text: 'Enter the credentials below and click Save, then use the Test Connection button to verify.' },
+    t('setupStep1'), t('setupStep2'), t('setupStep3'),
+    t('setupStep4'), t('setupStep5'), t('setupStep6'), t('setupStep7'),
   ];
 
   return (
     <div className="max-w-3xl space-y-6">
       {/* Navigation Tabs */}
-      <div className="flex gap-1 border-b border-gray-200">
-        <Link
-          href="/settings"
-          className="px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300 transition-colors"
-        >
-          {t('general')}
-        </Link>
-        <span
-          className="px-4 py-2.5 text-sm font-medium text-emerald-600 border-b-2 border-emerald-600"
-        >
-          {t('whatsapp')}
-        </span>
-        <Link
-          href="/settings/profile"
-          className="px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300 transition-colors"
-        >
-          {t('profile')}
-        </Link>
-      </div>
+      <SettingsTabs activeTab="whatsapp" />
 
       {/* Success Toast */}
       {saved && (
@@ -215,8 +162,8 @@ export default function SettingsWhatsappPage() {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Connection Status</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Live status of your WhatsApp API connection</p>
+            <h2 className="text-base font-semibold text-gray-900">{t('connectionStatus')}</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{t('connectionStatusDesc')}</p>
           </div>
           {statusBadge()}
         </div>
@@ -237,7 +184,7 @@ export default function SettingsWhatsappPage() {
                     p.quality_rating === 'YELLOW' ? 'bg-yellow-100 text-yellow-700' :
                     'bg-red-100 text-red-700'
                   }`}>
-                    Quality: {p.quality_rating}
+                    {t('qualityRating')}: {p.quality_rating}
                   </span>
                 )}
               </div>
@@ -257,14 +204,14 @@ export default function SettingsWhatsappPage() {
           disabled={connStatus === 'checking'}
           className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
         >
-          {connStatus === 'checking' ? 'Testing...' : 'Test Connection'}
+          {connStatus === 'checking' ? t('testing') : t('testConnection')}
         </button>
       </div>
 
       {/* Webhook Configuration Card */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-        <h2 className="text-base font-semibold text-gray-900 mb-1">Webhook Configuration</h2>
-        <p className="text-xs text-gray-500 mb-4">Configure these in your Meta App → WhatsApp → Configuration → Webhooks</p>
+        <h2 className="text-base font-semibold text-gray-900 mb-1">{t('webhookConfiguration')}</h2>
+        <p className="text-xs text-gray-500 mb-4">{t('webhookConfigDesc')}</p>
 
         {/* Webhook URL */}
         <div className="mb-4">
@@ -291,7 +238,7 @@ export default function SettingsWhatsappPage() {
 
         {/* Verify Token */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Verify Token</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('verifyToken')}</label>
           <div className="flex items-center gap-2">
             <input
               type="text"
@@ -312,9 +259,9 @@ export default function SettingsWhatsappPage() {
           </div>
         </div>
 
-        {/* Subscribed fields info */}
+        {/* Subscribed fields */}
         <div className="rounded-xl bg-blue-50 border border-blue-100 p-3">
-          <p className="text-xs font-medium text-blue-800 mb-2">Subscribe to these webhook fields:</p>
+          <p className="text-xs font-medium text-blue-800 mb-2">{t('subscribeWebhookFields')}</p>
           <div className="flex flex-wrap gap-2">
             {['messages', 'message_deliveries', 'message_reads'].map((field) => (
               <span key={field} className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs px-2.5 py-1 rounded-full font-medium">
@@ -330,12 +277,12 @@ export default function SettingsWhatsappPage() {
 
       {/* API Credentials Card */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-        <h2 className="text-base font-semibold text-gray-900 mb-1">API Credentials</h2>
-        <p className="text-xs text-gray-500 mb-5">Enter your WhatsApp Business API credentials from Meta Developer Console</p>
+        <h2 className="text-base font-semibold text-gray-900 mb-1">{t('apiCredentials')}</h2>
+        <p className="text-xs text-gray-500 mb-5">{t('apiCredentialsDesc')}</p>
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone Number ID</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('phoneNumberId')}</label>
             <input
               value={form.current_phone_number_id}
               onChange={(e) => setForm((s) => ({ ...s, current_phone_number_id: e.target.value }))}
@@ -344,7 +291,7 @@ export default function SettingsWhatsappPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">WhatsApp Business Account ID</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('businessAccountId')}</label>
             <input
               value={form.whatsapp_business_account_id}
               onChange={(e) => setForm((s) => ({ ...s, whatsapp_business_account_id: e.target.value }))}
@@ -353,7 +300,7 @@ export default function SettingsWhatsappPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Permanent Access Token</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('permanentAccessToken')}</label>
             <div className="relative">
               <input
                 type={showToken ? 'text' : 'password'}
@@ -399,15 +346,10 @@ export default function SettingsWhatsappPage() {
           className="w-full flex items-center justify-between px-6 py-4 text-start hover:bg-gray-50 transition-colors"
         >
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Setup Guide</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Step-by-step instructions to connect your WhatsApp Business account</p>
+            <h2 className="text-base font-semibold text-gray-900">{t('setupGuide')}</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{t('setupGuideDesc')}</p>
           </div>
-          <svg
-            className={`w-5 h-5 text-gray-400 transition-transform ${guideOpen ? 'rotate-180' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
+          <svg className={`w-5 h-5 text-gray-400 transition-transform ${guideOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
@@ -415,17 +357,17 @@ export default function SettingsWhatsappPage() {
         {guideOpen && (
           <div className="px-6 pb-6 border-t border-gray-100">
             <ol className="mt-4 space-y-4">
-              {setupSteps.map((step) => (
-                <li key={step.n} className="flex gap-3">
+              {setupSteps.map((step, i) => (
+                <li key={i} className="flex gap-3">
                   <span className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center mt-0.5">
-                    {step.n}
+                    {i + 1}
                   </span>
-                  <p className="text-sm text-gray-700 leading-relaxed">{step.text}</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{step}</p>
                 </li>
               ))}
             </ol>
             <div className="mt-5 rounded-xl bg-amber-50 border border-amber-100 p-3 text-xs text-amber-800">
-              <strong>Tip:</strong> Use a System User with permanent token to avoid token expiry issues. Temporary tokens expire after 24 hours.
+              <strong>Tip:</strong> {t('setupTip')}
             </div>
           </div>
         )}

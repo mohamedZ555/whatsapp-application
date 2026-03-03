@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
 export function CreateVendorButton() {
   const router = useRouter();
+  const tAdmin = useTranslations('admin');
+  const tCommon = useTranslations('common');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -40,10 +43,10 @@ export function CreateVendorButton() {
         setOpen(false);
         router.refresh();
       } else {
-        setError(data.error ?? 'Something went wrong.');
+        setError(data.error ?? tCommon('error'));
       }
     } catch {
-      setError('Something went wrong.');
+      setError(tCommon('error'));
     } finally {
       setLoading(false);
     }
@@ -53,15 +56,15 @@ export function CreateVendorButton() {
     ? createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">Add New Vendor</h2>
-            <p className="text-sm text-gray-500 mb-5">Creates the vendor workspace and its admin account.</p>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">{tAdmin('addNewVendor')}</h2>
+            <p className="text-sm text-gray-500 mb-5">{tAdmin('createVendorDesc')}</p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Vendor info */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Workspace</label>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{tAdmin('vendorWorkspace')}</label>
                 <input
-                  placeholder="Vendor / business name"
+                  placeholder={tAdmin('vendorBusinessName')}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
@@ -71,18 +74,18 @@ export function CreateVendorButton() {
 
               {/* Admin user info */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Admin Account</label>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{tAdmin('adminAccount')}</label>
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
                     <input
-                      placeholder="First name"
+                      placeholder={tAdmin('firstName') ?? 'First name'}
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       required
                       className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                     <input
-                      placeholder="Last name"
+                      placeholder={tAdmin('lastName') ?? 'Last name'}
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -90,14 +93,14 @@ export function CreateVendorButton() {
                   </div>
                   <input
                     type="email"
-                    placeholder="Email"
+                    placeholder={tAdmin('email')}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   <input
-                    placeholder="Username"
+                    placeholder={tAdmin('username')}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
@@ -105,7 +108,7 @@ export function CreateVendorButton() {
                   />
                   <input
                     type="password"
-                    placeholder="Password (min 6 characters)"
+                    placeholder={tAdmin('passwordMinChars')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -114,7 +117,7 @@ export function CreateVendorButton() {
                   />
                   <input
                     type="tel"
-                    placeholder="Phone number (optional)"
+                    placeholder={tAdmin('phoneOptional')}
                     value={mobileNumber}
                     onChange={(e) => setMobileNumber(e.target.value)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -132,14 +135,14 @@ export function CreateVendorButton() {
                   disabled={loading}
                   className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
-                  {loading ? 'Creating...' : 'Create Vendor'}
+                  {loading ? tAdmin('creating') : tAdmin('createVendor')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
                   className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
                 >
-                  Cancel
+                  {tCommon('cancel')}
                 </button>
               </div>
             </form>
@@ -155,7 +158,7 @@ export function CreateVendorButton() {
         onClick={openModal}
         className="rounded-md border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
       >
-        Add New Vendor
+        {tAdmin('addNewVendor')}
       </button>
       {modal}
     </>

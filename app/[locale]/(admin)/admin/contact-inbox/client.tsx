@@ -12,12 +12,13 @@ type ContactMsg = {
 };
 
 export default function ContactInboxClient({ messages: initial }: { messages: ContactMsg[] }) {
+  const tAdmin = useTranslations('admin');
   const tCommon = useTranslations('common');
   const [messages, setMessages] = useState(initial);
   const [selected, setSelected] = useState<ContactMsg | null>(null);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this message?')) return;
+    if (!confirm(tAdmin('deleteMessageConfirm'))) return;
     await fetch('/api/admin/contact-inbox', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -30,9 +31,9 @@ export default function ContactInboxClient({ messages: initial }: { messages: Co
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
-        <h1 className="text-[40px] font-normal leading-none tracking-tight text-emerald-950">Contact Inbox</h1>
+        <h1 className="text-[40px] font-normal leading-none tracking-tight text-emerald-950">{tAdmin('contactInbox')}</h1>
         <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">
-          {messages.length} message{messages.length !== 1 ? 's' : ''}
+          {messages.length}
         </span>
       </div>
 
@@ -41,7 +42,7 @@ export default function ContactInboxClient({ messages: initial }: { messages: Co
         <div className="lg:col-span-1 space-y-2 max-h-[75vh] overflow-y-auto">
           {messages.length === 0 && (
             <div className="rounded-xl border border-gray-100 bg-white p-6 text-center text-sm text-slate-400">
-              No messages yet.
+              {tAdmin('noMessages')}
             </div>
           )}
           {messages.map((msg) => (
@@ -72,7 +73,7 @@ export default function ContactInboxClient({ messages: initial }: { messages: Co
         <div className="lg:col-span-2">
           {!selected ? (
             <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white text-sm text-gray-400">
-              Select a message to view details
+              {tAdmin('selectMessage')}
             </div>
           ) : (
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
@@ -83,15 +84,15 @@ export default function ContactInboxClient({ messages: initial }: { messages: Co
                     {selected.email}
                   </a>
                   <p className="mt-0.5 text-xs text-gray-400">
-                    Received: {new Date(selected.createdAt).toLocaleString()}
+                    {tAdmin('received')}: {new Date(selected.createdAt).toLocaleString()}
                   </p>
                 </div>
                 <div className="flex gap-2">
                   <a
-                    href={`mailto:${selected.email}?subject=Re: Your message to FadaaWhats`}
+                    href={`mailto:${selected.email}?subject=Re: Your message`}
                     className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                   >
-                    Reply via Email
+                    {tAdmin('replyViaEmail')}
                   </a>
                   <button
                     onClick={() => handleDelete(selected.id)}

@@ -1,25 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 export default function MessageLogPage() {
   const t = useTranslations('messageLog');
   const tc = useTranslations('common');
+  const locale = useLocale();
+  const isArabic = locale === 'ar';
+
   const [logs, setLogs] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  // Filter state (pending user input before Apply)
   const [directionInput, setDirectionInput] = useState('');
   const [statusInput, setStatusInput] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [startDateInput, setStartDateInput] = useState('');
   const [endDateInput, setEndDateInput] = useState('');
 
-  // Applied filter state (used in fetch)
   const [direction, setDirection] = useState('');
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
@@ -35,8 +36,8 @@ export default function MessageLogPage() {
     if (startDate) params.set('startDate', startDate);
     if (endDate) params.set('endDate', endDate);
     fetch(`/api/message-log?${params}`)
-      .then(r => r.json())
-      .then(d => {
+      .then((r) => r.json())
+      .then((d) => {
         setLogs(d.data ?? []);
         setTotal(d.total ?? 0);
         setTotalPages(d.totalPages ?? 1);
@@ -76,15 +77,10 @@ export default function MessageLogPage() {
     received: 'bg-gray-50 text-gray-700',
   };
 
-  // Generate page number list (up to 5 around current page)
   function getPageNumbers(): number[] {
     const delta = 2;
     const range: number[] = [];
-    for (
-      let i = Math.max(1, page - delta);
-      i <= Math.min(totalPages, page + delta);
-      i++
-    ) {
+    for (let i = Math.max(1, page - delta); i <= Math.min(totalPages, page + delta); i++) {
       range.push(i);
     }
     return range;
@@ -97,15 +93,13 @@ export default function MessageLogPage() {
         <span className="text-sm text-gray-500">{total} {tc('results')}</span>
       </div>
 
-      {/* Filter Card */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-4 p-4 space-y-3">
-        {/* Row 1: Direction + Status + Search */}
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">{t('direction')}</label>
             <select
               value={directionInput}
-              onChange={e => setDirectionInput(e.target.value)}
+              onChange={(e) => setDirectionInput(e.target.value)}
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <option value="">{t('all')}</option>
@@ -117,44 +111,43 @@ export default function MessageLogPage() {
             <label className="block text-xs font-medium text-gray-600 mb-1">{tc('status')}</label>
             <select
               value={statusInput}
-              onChange={e => setStatusInput(e.target.value)}
+              onChange={(e) => setStatusInput(e.target.value)}
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <option value="">{t('all')}</option>
-              {['sent', 'delivered', 'read', 'failed', 'received'].map(s => (
+              {['sent', 'delivered', 'read', 'failed', 'received'].map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
           </div>
           <div className="flex-1 min-w-[180px]">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Contact name / phone</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">{t('contactNamePhone')}</label>
             <input
               type="text"
               value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
-              placeholder="Search contact..."
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder={t('searchContact')}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
         </div>
 
-        {/* Row 2: Date range + Apply/Clear buttons */}
         <div className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">{t('startDate')}</label>
             <input
               type="date"
               value={startDateInput}
-              onChange={e => setStartDateInput(e.target.value)}
+              onChange={(e) => setStartDateInput(e.target.value)}
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">{t('endDate')}</label>
             <input
               type="date"
               value={endDateInput}
-              onChange={e => setEndDateInput(e.target.value)}
+              onChange={(e) => setEndDateInput(e.target.value)}
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
@@ -164,20 +157,19 @@ export default function MessageLogPage() {
               onClick={handleApply}
               className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
             >
-              Apply
+              {t('apply')}
             </button>
             <button
               type="button"
               onClick={handleClear}
               className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
             >
-              Clear
+              {t('clear')}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
@@ -211,7 +203,7 @@ export default function MessageLogPage() {
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
                     log.isIncomingMessage ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'
                   }`}>
-                    {log.isIncomingMessage ? '↓ ' + t('incoming') : '↑ ' + t('outgoing')}
+                    {log.isIncomingMessage ? `? ${t('incoming')}` : `? ${t('outgoing')}`}
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -220,7 +212,7 @@ export default function MessageLogPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-gray-500 text-xs">
-                  {new Date(log.createdAt).toLocaleString()}
+                  {new Date(log.createdAt).toLocaleString(isArabic ? 'ar' : undefined)}
                 </td>
               </tr>
             ))}
@@ -228,18 +220,16 @@ export default function MessageLogPage() {
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-1 mt-4 flex-wrap">
           <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
             className="px-3 py-1.5 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50"
           >
             {tc('previous')}
           </button>
 
-          {/* First page + ellipsis */}
           {getPageNumbers()[0] > 1 && (
             <>
               <button
@@ -254,7 +244,7 @@ export default function MessageLogPage() {
             </>
           )}
 
-          {getPageNumbers().map(n => (
+          {getPageNumbers().map((n) => (
             <button
               key={n}
               onClick={() => setPage(n)}
@@ -268,7 +258,6 @@ export default function MessageLogPage() {
             </button>
           ))}
 
-          {/* Last page + ellipsis */}
           {getPageNumbers()[getPageNumbers().length - 1] < totalPages && (
             <>
               {getPageNumbers()[getPageNumbers().length - 1] < totalPages - 1 && (
@@ -284,7 +273,7 @@ export default function MessageLogPage() {
           )}
 
           <button
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
             className="px-3 py-1.5 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50"
           >

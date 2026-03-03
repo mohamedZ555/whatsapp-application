@@ -95,6 +95,7 @@ function statusBadgeClass(status: string) {
 export default async function SubscriptionPage() {
   const session = await getServerSession(authOptions);
   const t = await getTranslations('subscription');
+  const tr = (en: string, ar: string) => (t('title') === 'الاشتراك' ? ar : en);
 
   const user = session?.user as any;
   const vendorId = user?.vendorId as string | undefined;
@@ -102,8 +103,8 @@ export default async function SubscriptionPage() {
 
   if (!vendorId || roleId === USER_ROLES.SUPER_ADMIN) {
     return (
-      <div className="flex items-center justify-center h-64 text-slate-500">
-        No vendor context available.
+        <div className="flex items-center justify-center h-64 text-slate-500">
+        {tr('No vendor context available.', 'لا يتوفر سياق بائع.')}
       </div>
     );
   }
@@ -129,9 +130,9 @@ export default async function SubscriptionPage() {
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
           <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
           <div>
-            <p className="font-semibold text-amber-800">Your plan has expired</p>
+            <p className="font-semibold text-amber-800">{tr('Your plan has expired', 'انتهت صلاحية خطتك')}</p>
             <p className="text-sm text-amber-700 mt-0.5">
-              You are currently on the <strong>Free</strong> tier limits. Upgrade below to restore full access.
+              {tr('You are currently on the', 'أنت حاليًا على حدود خطة')} <strong>{t('free')}</strong> {tr('tier limits. Upgrade below to restore full access.', 'قم بالترقية أدناه لاستعادة الوصول الكامل.')}
             </p>
           </div>
         </div>
@@ -155,12 +156,12 @@ export default async function SubscriptionPage() {
             <div className="mt-2 flex flex-wrap gap-3 text-sm text-emerald-100">
               {activeSub?.status === 'active' && !isExpired && (
                 <span className="flex items-center gap-1">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Active
+                  <CheckCircle2 className="h-3.5 w-3.5" /> {t('active')}
                 </span>
               )}
               {activeSub?.endsAt && !isExpired && (
                 <span>
-                  Renews{' '}
+                  {tr('Renews', 'يتجدد')}{' '}
                   {new Date(activeSub.endsAt).toLocaleDateString('en-US', {
                     day: 'numeric',
                     month: 'short',
@@ -170,12 +171,12 @@ export default async function SubscriptionPage() {
               )}
               {remaining !== null && remaining <= 7 && remaining > 0 && (
                 <span className="rounded-full bg-amber-400/30 px-2 py-0.5 text-amber-200 text-xs font-semibold">
-                  {remaining} days left
+                  {tr(`${remaining} days left`, `متبقي ${remaining} يوم`)}
                 </span>
               )}
               {remaining === 0 && (
                 <span className="rounded-full bg-rose-400/30 px-2 py-0.5 text-rose-200 text-xs font-semibold">
-                  Expires today
+                  {tr('Expires today', 'تنتهي اليوم')}
                 </span>
               )}
             </div>
@@ -198,7 +199,7 @@ export default async function SubscriptionPage() {
 
       {/* Usage stats */}
       <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h3 className="font-semibold text-gray-900 mb-4">Current Usage</h3>
+        <h3 className="font-semibold text-gray-900 mb-4">{tr('Current Usage', 'الاستخدام الحالي')}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {items.map((item) => (
             <UsageBar key={item.key} label={item.label} used={item.used} limit={item.limit} />
@@ -214,7 +215,7 @@ export default async function SubscriptionPage() {
 
       {/* Plan comparison */}
       <div>
-        <h3 className="font-semibold text-gray-900 mb-4">Available Plans</h3>
+        <h3 className="font-semibold text-gray-900 mb-4">{tr('Available Plans', 'الخطط المتاحة')}</h3>
         <SubscriptionPlanCards
           currentPlanId={currentPlanId}
           currentBillingCycle={billingCycle}
@@ -227,17 +228,17 @@ export default async function SubscriptionPage() {
       {history.length > 0 && (
         <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-900">Subscription History</h3>
+            <h3 className="font-semibold text-gray-900">{tr('Subscription History', 'سجل الاشتراكات')}</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500">
-                  <th className="px-6 py-3 text-start font-semibold">Plan</th>
-                  <th className="px-6 py-3 text-start font-semibold">Billing</th>
-                  <th className="px-6 py-3 text-start font-semibold">Status</th>
-                  <th className="px-6 py-3 text-start font-semibold">Started</th>
-                  <th className="px-6 py-3 text-start font-semibold">Ended</th>
+                  <th className="px-6 py-3 text-start font-semibold">{tr('Plan', 'الخطة')}</th>
+                  <th className="px-6 py-3 text-start font-semibold">{tr('Billing', 'الفوترة')}</th>
+                  <th className="px-6 py-3 text-start font-semibold">{tr('Status', 'الحالة')}</th>
+                  <th className="px-6 py-3 text-start font-semibold">{tr('Started', 'بدأت')}</th>
+                  <th className="px-6 py-3 text-start font-semibold">{tr('Ended', 'انتهت')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">

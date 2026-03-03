@@ -68,6 +68,8 @@ const DEFAULT_FORM: ReplyForm = {
 export default function BotRepliesPage() {
   const t = useTranslations("bot");
   const tc = useTranslations("common");
+  const isArabic = t("title") === "ردود الروبوت";
+  const tr = (en: string, ar: string) => (isArabic ? ar : en);
 
   const [tab, setTab] = useState<"replies" | "flows">("replies");
 
@@ -396,7 +398,7 @@ export default function BotRepliesPage() {
                         setForm({ ...form, replyName: e.target.value })
                       }
                       className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                      placeholder="e.g. Technical Support"
+                      placeholder={t("replyName") + " ..."}
                       required
                     />
                   </div>
@@ -657,7 +659,7 @@ export default function BotRepliesPage() {
             <div className="rounded-2xl border border-gray-100 bg-white py-16 text-center shadow-sm">
               <p className="mb-2 text-4xl">🤖</p>
               <p className="font-semibold text-gray-600">
-                No quick replies yet
+                {tr("No quick replies yet", "لا توجد ردود سريعة بعد")}
               </p>
               <p className="mt-1 text-sm text-gray-400">
                 Create your first bot reply to automate responses
@@ -820,13 +822,13 @@ export default function BotRepliesPage() {
           {showCreateFlow && (
             <div className="mb-6 rounded-2xl border border-emerald-200 bg-white p-6 shadow-md">
               <h2 className="mb-4 font-semibold text-gray-900 text-base">
-                New Bot Flow
+                {t("createFlow")}
               </h2>
               <form onSubmit={handleCreateFlow} className="flex gap-3">
                 <input
                   value={newFlowName}
                   onChange={(e) => setNewFlowName(e.target.value)}
-                  placeholder="Flow name…"
+                  placeholder={t("flowName")}
                   className="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                   required
                   autoFocus
@@ -836,7 +838,7 @@ export default function BotRepliesPage() {
                   disabled={creatingFlow}
                   className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
                 >
-                  {creatingFlow ? "Creating…" : "Create & Open Builder →"}
+                  {creatingFlow ? tc("loading") : t("createFlow")}
                 </button>
                 <button
                   type="button"
@@ -947,7 +949,7 @@ export default function BotRepliesPage() {
                       onClick={() => setBuilderFlow(flow)}
                       className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
                     >
-                      ✏️ Open Builder
+                      ✏️ {t("flowBuilder")}
                     </button>
                     <button
                       onClick={() => handleToggleFlowStatus(flow)}

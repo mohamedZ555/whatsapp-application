@@ -2,7 +2,6 @@
 
 import { Link, usePathname } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
-import { useSession } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 import {
   Bot,
@@ -38,16 +37,20 @@ const iconMap = {
 } as const;
 
 type SidebarProps = {
+  roleId?: number;
+  permissions?: string[];
   planDisabledPerms?: string[];
   permissionsRestricted?: boolean;
 };
 
-export default function Sidebar({ planDisabledPerms = [], permissionsRestricted = false }: SidebarProps) {
+export default function Sidebar({
+  roleId,
+  permissions = [],
+  planDisabledPerms = [],
+  permissionsRestricted = false,
+}: SidebarProps) {
   const t = useTranslations('nav');
   const pathname = usePathname();
-  const { data: session } = useSession();
-  const roleId = (session?.user as { roleId?: number } | undefined)?.roleId;
-  const permissions = (session?.user as { permissions?: string[] } | undefined)?.permissions;
 
   const navItems = DASHBOARD_NAV_ITEMS.filter((item) =>
     canAccessDashboardItem(roleId, permissions, item, planDisabledPerms, permissionsRestricted)

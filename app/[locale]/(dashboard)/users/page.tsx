@@ -55,13 +55,16 @@ type UserEditState = {
   password: string;
   // Extra for UI context:
   adminName?: string;
-  adminPermissions?: string[]; // null means no restriction (e.g. super admin editing admin)
+  adminPermissions?: string[]; // undefined = no restriction (super admin editing admin), [] = admin has none
+  planDisabledPerms?: string[]; // permissions disabled by plan
 };
 
 type ExtendedSessionUser = {
   id: string;
   roleId?: number;
   vendorId?: string | null;
+  planDisabledPerms?: string[];
+  permissionsRestricted?: boolean;
 };
 type RoleFilter = "all" | "admins" | "employees";
 
@@ -181,32 +184,36 @@ function PermCheckboxes({
   selected,
   onChange,
   allowedPerms,
-  showWarnings = false,
+  planDisabledPerms = [],
 }: {
   selected: string[];
   onChange: (perms: string[]) => void;
-  allowedPerms?: string[]; // undefined = no restriction
-  showWarnings?: boolean; // show "admin lacks this" warnings
+  allowedPerms?: string[]; // undefined = no restriction from admin scope
+  planDisabledPerms?: string[]; // permissions disabled by subscription plan
 }) {
   return (
     <div className="space-y-1.5">
       <div className="flex flex-wrap gap-2">
         {VENDOR_PERMISSIONS.map((perm) => {
           const checked = selected.includes(perm);
+          const isPlanLocked = planDisabledPerms.includes(perm);
           const adminHas =
             allowedPerms === undefined || allowedPerms.includes(perm);
-          const locked = !adminHas;
+          const isAdminLocked = !adminHas;
+          const locked = isPlanLocked || isAdminLocked;
 
           return (
             <div key={perm} className="relative group">
               <label
                 className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors
                   ${
-                    locked
-                      ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300 opacity-60"
-                      : checked
-                        ? "border-emerald-400 bg-emerald-50 text-emerald-800"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                    isPlanLocked
+                      ? "cursor-not-allowed border-amber-100 bg-amber-50 text-amber-400 opacity-70"
+                      : isAdminLocked
+                        ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300 opacity-60"
+                        : checked
+                          ? "border-emerald-400 bg-emerald-50 text-emerald-800"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
                   }`}
               >
                 <input
@@ -223,13 +230,18 @@ function PermCheckboxes({
                     );
                   }}
                 />
-                {locked && <span className="text-[10px]">🔒</span>}
+                {isPlanLocked && <span className="text-[10px]">📋</span>}
+                {!isPlanLocked && isAdminLocked && (
+                  <span className="text-[10px]">🔒</span>
+                )}
                 {PERMISSION_LABELS[perm] ?? perm}
               </label>
               {/* Tooltip for locked permissions */}
               {locked && (
                 <div className="pointer-events-none absolute -top-9 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-slate-800 px-2.5 py-1.5 text-[11px] text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 whitespace-nowrap">
-                  Admin doesn't have this permission
+                  {isPlanLocked
+                    ? "Disabled by subscription plan"
+                    : "Admin doesn't have this permission"}
                   <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
                 </div>
               )}
@@ -238,25 +250,49 @@ function PermCheckboxes({
         })}
       </div>
 
-      {/* Warning banner if admin has no permissions */}
-      {allowedPerms !== undefined && allowedPerms.length === 0 && (
+      {/* Plan-locked warning */}
+      {planDisabledPerms.length > 0 && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
-          <span className="text-sm">⚠️</span>
+          <span className="text-sm">📋</span>
           <div>
-            <p className="font-semibold">Admin has no permissions</p>
+            <p className="font-semibold">
+              Some permissions are locked by the current plan
+            </p>
             <p className="mt-0.5">
-              The admin this employee belongs to has no permissions assigned.
-              All checkboxes are locked. Edit the admin first to grant them
-              permissions.
+              Upgrade the subscription plan to unlock{" "}
+              {planDisabledPerms
+                .map((p) => PERMISSION_LABELS[p] ?? p)
+                .join(", ")}
+              .
             </p>
           </div>
         </div>
       )}
 
-      {/* Info if some are locked */}
+      {/* Warning banner if admin has no permissions */}
+      {allowedPerms !== undefined &&
+        allowedPerms.filter((p) => !planDisabledPerms.includes(p)).length ===
+          0 &&
+        allowedPerms.length === 0 && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
+            <span className="text-sm">⚠️</span>
+            <div>
+              <p className="font-semibold">Admin has no permissions</p>
+              <p className="mt-0.5">
+                The admin this employee belongs to has no permissions assigned.
+                All checkboxes are locked. Edit the admin first to grant them
+                permissions.
+              </p>
+            </div>
+          </div>
+        )}
+
+      {/* Info if some are locked by admin scope */}
       {allowedPerms !== undefined &&
         allowedPerms.length > 0 &&
-        VENDOR_PERMISSIONS.some((p) => !allowedPerms.includes(p)) && (
+        VENDOR_PERMISSIONS.some(
+          (p) => !allowedPerms.includes(p) && !planDisabledPerms.includes(p),
+        ) && (
           <p className="text-[11px] text-slate-400">
             🔒 Locked permissions are not available because the admin (owner)
             doesn't have them.
@@ -349,6 +385,7 @@ function CreateModal({
 }) {
   const t = useTranslations("users");
   const tc = useTranslations("common");
+  const isArabic = t("title") === "أعضاء الفريق";
   const [form, setForm] = useState<UserFormState>({
     firstName: "",
     lastName: "",
@@ -363,6 +400,23 @@ function CreateModal({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [createPlanPerms, setCreatePlanPerms] = useState<string[]>([]);
+
+  // Fetch plan-disabled perms when vendor selection changes (super admin creating employee for specific vendor)
+  useEffect(() => {
+    const targetVendorId = form.vendorId || sessionVendorId;
+    if (!targetVendorId) return;
+    fetch(
+      `/api/subscription/plan-perms?vendorId=${encodeURIComponent(targetVendorId)}`,
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) =>
+        setCreatePlanPerms(
+          Array.isArray(d?.planDisabledPerms) ? d.planDisabledPerms : [],
+        ),
+      )
+      .catch(() => setCreatePlanPerms([]));
+  }, [form.vendorId, sessionVendorId]);
 
   function set<K extends keyof UserFormState>(key: K, value: UserFormState[K]) {
     setForm((s) => ({ ...s, [key]: value }));
@@ -374,6 +428,7 @@ function CreateModal({
     const filtered = adminPerms
       ? form.permissions.filter((p) => adminPerms.includes(p))
       : form.permissions;
+    // Also strip plan-locked perms (will be re-filtered after fetch)
     setForm((s) => ({ ...s, vendorId, permissions: filtered }));
   }
 
@@ -533,8 +588,14 @@ function CreateModal({
               </label>
               <PermCheckboxes
                 selected={form.permissions}
-                onChange={(perms) => set("permissions", perms)}
+                onChange={(perms) =>
+                  set(
+                    "permissions",
+                    perms.filter((p) => !createPlanPerms.includes(p)),
+                  )
+                }
                 allowedPerms={isEmployee ? allowedPerms : undefined}
+                planDisabledPerms={createPlanPerms}
               />
             </div>
           )}
@@ -577,6 +638,7 @@ function EditModal({
   onClose: () => void;
   onUpdated: () => void;
 }) {
+  const planDisabledPerms = initial.planDisabledPerms ?? [];
   const tc = useTranslations("common");
   const t = useTranslations("users");
   const [form, setForm] = useState<UserEditState>(initial);
@@ -643,10 +705,16 @@ function EditModal({
   const isOwnAccount = form.userId === sessionUserId;
   const isEmployee = form.roleId === USER_ROLES.VENDOR_USER;
   const isAdmin = form.roleId === USER_ROLES.VENDOR;
-  const showPerms = isEmployee || (isSuperAdmin && isAdmin);
+  const showPerms = isEmployee || (isSuperAdmin && isAdmin) || isAdmin;
 
   // For employees: only allow permissions the admin has
+  // For admins: no admin-scope restriction (they can get any non-plan-locked perm)
   const allowedPerms = isEmployee ? initial.adminPermissions : undefined;
+
+  // Strip planDisabledPerms from selected permissions on render to prevent stale state
+  const effectivePermissions = form.permissions.filter(
+    (p) => !planDisabledPerms.includes(p),
+  );
 
   const statusOptions = [
     { value: 1, label: "Active" },
@@ -828,7 +896,7 @@ function EditModal({
             <div className="md:col-span-2">
               <label className="mb-2 block text-sm font-semibold text-slate-700">
                 {t("permissions")}
-                {isAdmin && isSuperAdmin && (
+                {isAdmin && (
                   <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-normal text-blue-600 border border-blue-200">
                     Admin-level · changes cascade to employees
                   </span>
@@ -836,13 +904,20 @@ function EditModal({
               </label>
               <PermCheckboxes
                 selected={form.permissions}
-                onChange={(perms) => set("permissions", perms)}
+                onChange={(perms) =>
+                  set(
+                    "permissions",
+                    perms.filter((p) => !planDisabledPerms.includes(p)),
+                  )
+                }
                 allowedPerms={isEmployee ? allowedPerms : undefined}
+                planDisabledPerms={planDisabledPerms}
               />
               {isAdmin &&
-                isSuperAdmin &&
-                form.permissions.length <
-                  (initial.permissions?.length ?? 0) && (
+                effectivePermissions.length <
+                  (initial.permissions?.filter(
+                    (p) => !planDisabledPerms.includes(p),
+                  ).length ?? 0) && (
                   <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-700">
                     <span>⚠️</span>
                     <span>
@@ -884,12 +959,15 @@ function EditModal({
 export default function UsersPage() {
   const t = useTranslations("users");
   const tc = useTranslations("common");
+  const isArabic = t("title") === "أعضاء الفريق";
+  const tr = (en: string, ar: string) => (isArabic ? ar : en);
   const { data: session } = useSession();
   const sessionUser = session?.user as ExtendedSessionUser | undefined;
 
   const roleId = sessionUser?.roleId;
   const sessionUserId = sessionUser?.id;
   const sessionVendorId = sessionUser?.vendorId ?? undefined;
+  const sessionPlanDisabledPerms = sessionUser?.planDisabledPerms ?? [];
   const isSuperAdmin = roleId === USER_ROLES.SUPER_ADMIN;
   const isVendorAdmin = roleId === USER_ROLES.VENDOR;
   const canManageUsers = isSuperAdmin || isVendorAdmin;
@@ -971,11 +1049,12 @@ export default function UsersPage() {
     return map;
   }, [adminByVendorId]);
 
-  function openEdit(row: UserRow) {
+  async function openEdit(row: UserRow) {
     setActionError("");
 
     let adminPermissions: string[] | undefined = undefined;
     let adminName: string | undefined = undefined;
+    let planDisabledPerms: string[] = [];
 
     // For employees, find their admin's permissions
     if (row.roleId === USER_ROLES.VENDOR_USER && row.vendorId) {
@@ -987,7 +1066,30 @@ export default function UsersPage() {
       }
       // If no admin found (edge case), leave undefined = no restriction
     }
-    // For vendor admins edited by super admin: no restriction (undefined)
+
+    // Determine plan-disabled perms for the target vendor
+    const targetVendorId = row.vendorId ?? row.vendor?.id ?? "";
+    if (targetVendorId) {
+      if (isSuperAdmin) {
+        // Super admin: fetch the vendor's actual plan-disabled perms dynamically
+        try {
+          const res = await fetch(
+            `/api/subscription/plan-perms?vendorId=${encodeURIComponent(targetVendorId)}`,
+          );
+          if (res.ok) {
+            const data = await res.json();
+            planDisabledPerms = Array.isArray(data.planDisabledPerms)
+              ? data.planDisabledPerms
+              : [];
+          }
+        } catch {
+          planDisabledPerms = [];
+        }
+      } else if (targetVendorId === sessionVendorId) {
+        // Vendor admin: use session plan-disabled perms (already in session)
+        planDisabledPerms = sessionPlanDisabledPerms;
+      }
+    }
 
     setEditing({
       userId: row.id,
@@ -998,11 +1100,12 @@ export default function UsersPage() {
       mobileNumber: row.mobileNumber ?? "",
       roleId: row.roleId,
       status: row.status,
-      vendorId: row.vendorId ?? row.vendor?.id ?? "",
+      vendorId: targetVendorId,
       permissions: row.vendorUserDetail?.permissions ?? [],
       password: "",
       adminPermissions,
       adminName,
+      planDisabledPerms,
     });
   }
 
@@ -1149,13 +1252,13 @@ export default function UsersPage() {
               text: "text-slate-700",
             },
             {
-              label: "Admins",
+              label: t("adminRole"),
               value: stats.admins,
               cls: "bg-blue-50 border-blue-200",
               text: "text-blue-700",
             },
             {
-              label: "Employees",
+              label: t("employeeRole"),
               value: stats.employees,
               cls: "bg-emerald-50 border-emerald-200",
               text: "text-emerald-700",
@@ -1180,9 +1283,12 @@ export default function UsersPage() {
         <div className="flex rounded-lg border border-slate-200 bg-white p-1 text-sm shadow-sm">
           {(
             [
-              { key: "all", label: `All (${stats.total})` },
-              { key: "admins", label: `Admins (${stats.admins})` },
-              { key: "employees", label: `Employees (${stats.employees})` },
+              { key: "all", label: `${tr("All", "الكل")} (${stats.total})` },
+              { key: "admins", label: `${t("adminRole")} (${stats.admins})` },
+              {
+                key: "employees",
+                label: `${t("employeeRole")} (${stats.employees})`,
+              },
             ] as { key: RoleFilter; label: string }[]
           ).map(({ key, label }) => (
             <button
@@ -1413,7 +1519,7 @@ export default function UsersPage() {
                           </div>
                         ) : (
                           <span className="text-[11px] text-slate-400 italic">
-                            Unassigned
+                            {t("myWorkspace")}
                           </span>
                         )}
                       </td>
@@ -1546,7 +1652,7 @@ export default function UsersPage() {
       {isSuperAdmin && (
         <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
           <h3 className="mb-2 text-xs font-bold text-slate-600 uppercase tracking-wide">
-            🔗 Permission Inheritance Rules
+            🔗 {t("permissions")}
           </h3>
           <ul className="space-y-1 text-xs text-slate-500">
             <li>
@@ -1561,6 +1667,11 @@ export default function UsersPage() {
             <li>
               • <strong>Locked checkboxes 🔒</strong> — when editing an
               employee, permissions the admin doesn't have are shown locked.
+            </li>
+            <li>
+              • <strong>Plan-locked checkboxes 📋</strong> — permissions
+              disabled by the vendor's subscription plan cannot be assigned to
+              any user.
             </li>
           </ul>
         </div>

@@ -17,6 +17,7 @@ type CmsPage = {
 type PageForm = { title: string; slug: string; content: string; showInMenu: boolean; status: number };
 
 export default function AdminPagesClient({ pages: init }: { pages: CmsPage[] }) {
+  const tAdmin = useTranslations('admin');
   const tCommon = useTranslations('common');
   const [pages, setPages] = useState(init);
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
@@ -64,7 +65,7 @@ export default function AdminPagesClient({ pages: init }: { pages: CmsPage[] }) 
       const method = modal === 'edit' ? 'PUT' : 'POST';
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       const data = await res.json();
-      if (!res.ok) { alert(data.error ?? 'Error'); return; }
+      if (!res.ok) { alert(data.error ?? tCommon('error')); return; }
       await refreshPages();
       setModal(null);
     } finally {
@@ -73,7 +74,7 @@ export default function AdminPagesClient({ pages: init }: { pages: CmsPage[] }) 
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this page?')) return;
+    if (!confirm(tAdmin('deletePageConfirm'))) return;
     await fetch('/api/admin/pages/' + id, { method: 'DELETE' });
     setPages((prev) => prev.filter((p) => p.id !== id));
   };
@@ -81,13 +82,13 @@ export default function AdminPagesClient({ pages: init }: { pages: CmsPage[] }) 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
-        <h1 className="text-[40px] font-normal leading-none tracking-tight text-emerald-950">Pages</h1>
+        <h1 className="text-[40px] font-normal leading-none tracking-tight text-emerald-950">{tAdmin('pages')}</h1>
         <div className="flex gap-2">
           <button onClick={handleSeed} disabled={seeding} className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60">
-            {seeding ? 'Seeding...' : 'Seed Terms & Privacy'}
+            {seeding ? tAdmin('seeding') : tAdmin('seedTermsPrivacy')}
           </button>
           <button onClick={openCreate} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
-            + New Page
+            + {tAdmin('newPage')}
           </button>
         </div>
       </div>
@@ -96,11 +97,11 @@ export default function AdminPagesClient({ pages: init }: { pages: CmsPage[] }) 
         <table className="w-full border-collapse text-[13px] text-slate-600">
           <thead>
             <tr className="border-b border-emerald-100 bg-emerald-50/50 text-[11px] uppercase tracking-[0.12em] text-slate-600">
-              <th className="px-4 py-3 text-start font-semibold">Title</th>
-              <th className="px-4 py-3 text-start font-semibold">Slug</th>
-              <th className="px-4 py-3 text-start font-semibold">In Menu</th>
-              <th className="px-4 py-3 text-start font-semibold">Status</th>
-              <th className="px-4 py-3 text-start font-semibold">Preview</th>
+              <th className="px-4 py-3 text-start font-semibold">{tAdmin('titleColumn')}</th>
+              <th className="px-4 py-3 text-start font-semibold">{tAdmin('slug')}</th>
+              <th className="px-4 py-3 text-start font-semibold">{tAdmin('inMenu')}</th>
+              <th className="px-4 py-3 text-start font-semibold">{tCommon('status')}</th>
+              <th className="px-4 py-3 text-start font-semibold">{tCommon('view')}</th>
               <th className="px-4 py-3 text-start font-semibold">{tCommon('actions')}</th>
             </tr>
           </thead>
@@ -108,11 +109,10 @@ export default function AdminPagesClient({ pages: init }: { pages: CmsPage[] }) 
             {pages.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-400">
-                  No pages yet.{' '}
+                  {tAdmin('noPages')}{' '}
                   <button onClick={handleSeed} className="text-emerald-600 hover:underline font-medium">
-                    Seed Terms &amp; Privacy
+                    {tAdmin('seedTermsPrivacy')}
                   </button>
-                  {' '}to create default pages.
                 </td>
               </tr>
             )}
@@ -122,17 +122,17 @@ export default function AdminPagesClient({ pages: init }: { pages: CmsPage[] }) 
                 <td className="px-4 py-3 font-mono text-xs text-slate-500">/{page.slug}</td>
                 <td className="px-4 py-3">
                   <span className={page.showInMenu ? 'rounded px-2 py-0.5 text-[11px] font-semibold bg-green-100 text-green-700' : 'rounded px-2 py-0.5 text-[11px] font-semibold bg-gray-100 text-gray-500'}>
-                    {page.showInMenu ? 'Yes' : 'No'}
+                    {page.showInMenu ? tCommon('yes') : tCommon('no')}
                   </span>
                 </td>
                 <td className="px-4 py-3">
                   <span className={page.status === 1 ? 'rounded px-2 py-0.5 text-[11px] font-semibold bg-green-100 text-green-700' : 'rounded px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-700'}>
-                    {page.status === 1 ? 'Published' : 'Draft'}
+                    {page.status === 1 ? tAdmin('published') : tAdmin('draft')}
                   </span>
                 </td>
                 <td className="px-4 py-3">
                   <Link href={`/page/${page.slug}`} target="_blank" className="text-xs text-blue-600 hover:underline">
-                    View →
+                    {tCommon('view')} →
                   </Link>
                 </td>
                 <td className="px-4 py-3">
@@ -156,7 +156,7 @@ export default function AdminPagesClient({ pages: init }: { pages: CmsPage[] }) 
           <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
-                {modal === 'create' ? 'Create Page' : 'Edit Page'}
+                {modal === 'create' ? tAdmin('createPage') : tAdmin('editPage')}
               </h2>
               <button onClick={() => setModal(null)} className="text-2xl leading-none text-gray-400 hover:text-gray-600">
                 &times;
@@ -165,7 +165,7 @@ export default function AdminPagesClient({ pages: init }: { pages: CmsPage[] }) 
             <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">Title</label>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">{tAdmin('titleColumn')}</label>
                   <input
                     required
                     value={form.title}
@@ -174,7 +174,7 @@ export default function AdminPagesClient({ pages: init }: { pages: CmsPage[] }) 
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">Slug</label>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">{tAdmin('slug')}</label>
                   <input
                     required
                     value={form.slug}
@@ -186,7 +186,7 @@ export default function AdminPagesClient({ pages: init }: { pages: CmsPage[] }) 
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Content <span className="font-normal text-gray-400">(HTML supported)</span>
+                  {tAdmin('contentHtml')}
                 </label>
                 <textarea
                   rows={14}
@@ -203,17 +203,17 @@ export default function AdminPagesClient({ pages: init }: { pages: CmsPage[] }) 
                     onChange={(e) => setForm({ ...form, showInMenu: e.target.checked })}
                     className="h-4 w-4 rounded"
                   />
-                  Show in Navigation Menu
+                  {tAdmin('showInMenuLabel')}
                 </label>
                 <label className="flex items-center gap-2 text-sm text-gray-700">
-                  Status:
+                  {tCommon('status')}:
                   <select
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: Number(e.target.value) })}
                     className="rounded-lg border border-gray-300 px-2 py-1 text-sm outline-none"
                   >
-                    <option value={1}>Published</option>
-                    <option value={0}>Draft</option>
+                    <option value={1}>{tAdmin('published')}</option>
+                    <option value={0}>{tAdmin('draft')}</option>
                   </select>
                 </label>
               </div>
@@ -222,7 +222,7 @@ export default function AdminPagesClient({ pages: init }: { pages: CmsPage[] }) 
                   {tCommon('cancel')}
                 </button>
                 <button type="submit" disabled={loading} className="rounded-lg bg-emerald-600 px-6 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
-                  {loading ? 'Saving...' : tCommon('save')}
+                  {loading ? tCommon('saving') : tCommon('save')}
                 </button>
               </div>
             </form>
