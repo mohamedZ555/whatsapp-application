@@ -1,54 +1,98 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import dynamic from "next/dynamic";
 
-type FlowStep = {
-  type: 'send_text' | 'send_buttons' | 'send_list' | 'condition_text' | 'end';
-  text?: string;
-  conditionValue?: string;
-  operator?: 'equals' | 'contains' | 'starts_with' | 'ends_with';
-  optionsText?: string;
+const FlowBuilder = dynamic(() => import("./FlowBuilder"), { ssr: false });
+
+// ─── Types ─────────────────────────────────────────────────────────────────
+
+type OptionItem = { id: string; title: string };
+
+type ReplyForm = {
+  replyName: string;
+  triggerType: string;
+  triggerSubject: string;
+  replyMessage: string;
+  replyType: "text" | "buttons" | "list";
+  buttonText: string; // list button label
+  options: OptionItem[]; // dynamic options for buttons / list rows
 };
 
-export default function BotRepliesPage() {
-  const t = useTranslations('bot');
-  const tc = useTranslations('common');
-  const defaultWelcomeMessage = t('defaultWelcomeMessage');
-  const [tab, setTab] = useState<'replies' | 'flows'>('replies');
+type JobCategory = { id: string; name: string; color: string };
 
+type Flow = {
+  id: string;
+  flowName: string;
+  description: string | null;
+  status: number;
+  jobCategoryId: string | null;
+  data: any;
+  createdAt: string;
+};
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function uid() {
+  return Math.random().toString(36).slice(2, 9);
+}
+
+const TRIGGER_LABELS: Record<string, string> = {
+  welcome: "Welcome message",
+  is: "Message is exactly",
+  starts_with: "Message starts with",
+  ends_with: "Message ends with",
+  contains_word: "Message contains word",
+  contains: "Message contains",
+  stop_promotional: "Stop promotional",
+  start_promotional: "Start promotional",
+  start_ai_bot: "Start AI bot",
+  stop_ai_bot: "Stop AI bot",
+};
+
+const TRIGGER_TYPES = Object.keys(TRIGGER_LABELS);
+
+const DEFAULT_FORM: ReplyForm = {
+  replyName: "",
+  triggerType: "is",
+  triggerSubject: "",
+  replyMessage: "",
+  replyType: "text",
+  buttonText: "View Options",
+  options: [],
+};
+
+// ─── Page ──────────────────────────────────────────────────────────────────
+
+export default function BotRepliesPage() {
+  const t = useTranslations("bot");
+  const tc = useTranslations("common");
+
+  const [tab, setTab] = useState<"replies" | "flows">("replies");
+
+  // ── Quick Replies ────────────────────────────────────────────────────────
   const [replies, setReplies] = useState<any[]>([]);
   const [loadingReplies, setLoadingReplies] = useState(true);
-  const [showReplyForm, setShowReplyForm] = useState(false);
-  const [replyForm, setReplyForm] = useState({
-    replyName: '',
-    triggerType: 'is',
-    triggerSubject: '',
-    replyMessage: '',
-    replyType: 'text',
-    optionsText: '',
-  });
+  const [showForm, setShowForm] = useState(false);
+  const [editingReply, setEditingReply] = useState<any | null>(null);
+  const [form, setForm] = useState<ReplyForm>(DEFAULT_FORM);
   const [savingReply, setSavingReply] = useState(false);
 
-  const [flows, setFlows] = useState<any[]>([]);
+  // ── Flows ────────────────────────────────────────────────────────────────
+  const [flows, setFlows] = useState<Flow[]>([]);
   const [loadingFlows, setLoadingFlows] = useState(true);
-  const [showFlowForm, setShowFlowForm] = useState(false);
-  const [savingFlow, setSavingFlow] = useState(false);
-  const [flowName, setFlowName] = useState('');
-  const [flowTriggerType, setFlowTriggerType] = useState<'any' | 'keyword' | 'welcome'>('keyword');
-  const [flowTriggerValue, setFlowTriggerValue] = useState('');
-  const [steps, setSteps] = useState<FlowStep[]>([
-    { type: 'send_text', text: defaultWelcomeMessage },
-    { type: 'end' },
-  ]);
+  const [categories, setCategories] = useState<JobCategory[]>([]);
+  const [showCreateFlow, setShowCreateFlow] = useState(false);
+  const [newFlowName, setNewFlowName] = useState("");
+  const [creatingFlow, setCreatingFlow] = useState(false);
+  const [builderFlow, setBuilderFlow] = useState<Flow | null>(null);
 
-  const triggerTypes = ['welcome', 'is', 'starts_with', 'ends_with', 'contains_word', 'contains', 'stop_promotional', 'start_promotional', 'start_ai_bot', 'stop_ai_bot'];
-
-  const canSaveFlow = useMemo(() => flowName.trim().length > 0 && steps.length > 0, [flowName, steps]);
+  // ── Fetch ────────────────────────────────────────────────────────────────
 
   async function fetchReplies() {
     setLoadingReplies(true);
-    const res = await fetch('/api/bot-replies');
+    const res = await fetch("/api/bot-replies");
     const data = await res.json();
     setReplies(Array.isArray(data) ? data : []);
     setLoadingReplies(false);
@@ -56,433 +100,907 @@ export default function BotRepliesPage() {
 
   async function fetchFlows() {
     setLoadingFlows(true);
-    const res = await fetch('/api/bot-flows');
+    const res = await fetch("/api/bot-flows");
     const data = await res.json();
     setFlows(Array.isArray(data) ? data : []);
     setLoadingFlows(false);
   }
 
+  async function fetchCategories() {
+    const res = await fetch("/api/job-categories");
+    const data = await res.json();
+    setCategories(Array.isArray(data.categories) ? data.categories : []);
+  }
+
   useEffect(() => {
     fetchReplies();
     fetchFlows();
+    fetchCategories();
   }, []);
 
-  async function handleCreateReply(e: React.FormEvent) {
+  // ── Option item helpers ──────────────────────────────────────────────────
+
+  function addOption() {
+    setForm((f) => ({
+      ...f,
+      options: [...f.options, { id: uid(), title: "" }],
+    }));
+  }
+
+  function removeOption(id: string) {
+    setForm((f) => ({ ...f, options: f.options.filter((o) => o.id !== id) }));
+  }
+
+  function updateOption(id: string, title: string) {
+    setForm((f) => ({
+      ...f,
+      options: f.options.map((o) => (o.id === id ? { ...o, title } : o)),
+    }));
+  }
+
+  function resetForm() {
+    setForm(DEFAULT_FORM);
+    setEditingReply(null);
+    setShowForm(false);
+  }
+
+  function openCreateForm() {
+    setForm(DEFAULT_FORM);
+    setEditingReply(null);
+    setShowForm(true);
+  }
+
+  function openEditForm(reply: any) {
+    const existing = reply.data ?? {};
+    let options: OptionItem[] = [];
+
+    if (reply.replyType === "buttons" && Array.isArray(existing.buttons)) {
+      options = existing.buttons.map((b: any) => ({
+        id: b.id ?? uid(),
+        title: b.title ?? "",
+      }));
+    } else if (reply.replyType === "list") {
+      const rows = existing.sections?.[0]?.rows ?? [];
+      options = rows.map((r: any) => ({
+        id: r.id ?? uid(),
+        title: r.title ?? "",
+      }));
+    }
+
+    setForm({
+      replyName: reply.replyName ?? "",
+      triggerType: reply.triggerType ?? "is",
+      triggerSubject: reply.triggerSubject ?? "",
+      replyMessage: reply.replyMessage ?? "",
+      replyType: reply.replyType ?? "text",
+      buttonText: existing.buttonText ?? "View Options",
+      options,
+    });
+    setEditingReply(reply);
+    setShowForm(true);
+  }
+
+  // ── Save reply ───────────────────────────────────────────────────────────
+
+  async function handleSaveReply(e: React.FormEvent) {
     e.preventDefault();
     setSavingReply(true);
 
     let data: any = {};
-    if (replyForm.replyType === 'buttons') {
-      const buttons = replyForm.optionsText
-        .split(',')
-        .map((s, idx) => ({ id: `btn_${idx + 1}`, title: s.trim() }))
-        .filter((o) => o.title.length > 0);
-      data = { buttons };
-    } else if (replyForm.replyType === 'list') {
-      const rows = replyForm.optionsText
-        .split(',')
-        .map((s, idx) => ({ id: `row_${idx + 1}`, title: s.trim() }))
-        .filter((o) => o.title.length > 0);
-      data = { buttonText: t('viewOptions'), sections: [{ title: t('optionsLabel'), rows }] };
+    const validOptions = form.options.filter((o) => o.title.trim());
+
+    if (form.replyType === "buttons") {
+      data = {
+        buttons: validOptions.map((o, i) => ({
+          id: o.id || `btn_${i + 1}`,
+          title: o.title.trim(),
+        })),
+      };
+    } else if (form.replyType === "list") {
+      data = {
+        buttonText: form.buttonText.trim() || "View Options",
+        sections: [
+          {
+            title: t("optionsLabel"),
+            rows: validOptions.map((o, i) => ({
+              id: o.id || `row_${i + 1}`,
+              title: o.title.trim(),
+            })),
+          },
+        ],
+      };
     }
 
-    await fetch('/api/bot-replies', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        replyName: replyForm.replyName,
-        triggerType: replyForm.triggerType,
-        triggerSubject: replyForm.triggerSubject,
-        replyMessage: replyForm.replyMessage,
-        replyType: replyForm.replyType,
-        data,
-      }),
-    });
+    const payload = {
+      replyName: form.replyName,
+      triggerType: form.triggerType,
+      triggerSubject: form.triggerSubject,
+      replyMessage: form.replyMessage,
+      replyType: form.replyType,
+      data,
+    };
+
+    if (editingReply) {
+      await fetch("/api/bot-replies", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingReply.id, ...payload }),
+      });
+    } else {
+      await fetch("/api/bot-replies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    }
+
     setSavingReply(false);
-    setShowReplyForm(false);
-    setReplyForm({
-      replyName: '',
-      triggerType: 'is',
-      triggerSubject: '',
-      replyMessage: '',
-      replyType: 'text',
-      optionsText: '',
-    });
+    resetForm();
     fetchReplies();
   }
 
   async function handleDeleteReply(id: string) {
-    if (!window.confirm(tc('confirmDelete'))) return;
-    await fetch(`/api/bot-replies?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!confirm(tc("confirmDelete"))) return;
+    await fetch(`/api/bot-replies?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
     fetchReplies();
   }
 
   async function handleToggleReplyStatus(reply: any) {
-    const newStatus = reply.status === 1 ? 2 : 1;
-    await fetch('/api/bot-replies', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: reply.id, status: newStatus }),
+    await fetch("/api/bot-replies", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: reply.id,
+        status: reply.status === 1 ? 2 : 1,
+      }),
     });
     fetchReplies();
   }
 
-  async function handleDeleteFlow(id: string) {
-    if (!window.confirm(tc('confirmDelete'))) return;
-    await fetch(`/api/bot-flows/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    fetchFlows();
-  }
+  // ── Flow handlers ────────────────────────────────────────────────────────
 
-  async function handleToggleFlowStatus(flow: any) {
-    const newStatus = flow.status === 1 ? 2 : 1;
-    await fetch(`/api/bot-flows/${encodeURIComponent(flow.id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    });
-    fetchFlows();
-  }
-
-  function moveStep(index: number, dir: -1 | 1) {
-    const nextIndex = index + dir;
-    if (nextIndex < 0 || nextIndex >= steps.length) return;
-    const next = [...steps];
-    const current = next[index];
-    next[index] = next[nextIndex];
-    next[nextIndex] = current;
-    setSteps(next);
-  }
-
-  async function createFlow(e: React.FormEvent) {
+  async function handleCreateFlow(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSaveFlow) return;
-    setSavingFlow(true);
-
-    const nodes = steps.map((step, idx) => {
-      const id = `step_${idx + 1}`;
-      const nextId = idx < steps.length - 1 ? `step_${idx + 2}` : undefined;
-
-      if (step.type === 'send_buttons') {
-        const buttons = (step.optionsText ?? '')
-          .split(',')
-          .map((value, optionIdx) => ({
-            id: `${id}_btn_${optionIdx + 1}`,
-            title: value.trim(),
-            nextId,
-          }))
-          .filter((opt) => opt.title.length > 0);
-        return { id, type: step.type, text: step.text, buttons, nextId };
-      }
-
-      if (step.type === 'send_list') {
-        const rows = (step.optionsText ?? '')
-          .split(',')
-          .map((value, optionIdx) => ({
-            id: `${id}_row_${optionIdx + 1}`,
-            title: value.trim(),
-            nextId,
-          }))
-          .filter((opt) => opt.title.length > 0);
-        return {
-          id,
-          type: step.type,
-          text: step.text,
-          listButtonText: t('viewOptions'),
-          sections: [{ title: t('optionsLabel'), rows }],
-          nextId,
-        };
-      }
-
-      if (step.type === 'condition_text') {
-        return {
-          id,
-          type: step.type,
-          operator: step.operator ?? 'contains',
-          value: step.conditionValue ?? '',
-          trueNextId: nextId,
-          falseNextId: nextId,
-        };
-      }
-
-      if (step.type === 'end') {
-        return { id, type: 'end' };
-      }
-
-      return { id, type: step.type, text: step.text, nextId };
-    });
-
-    await fetch('/api/bot-flows', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    if (!newFlowName.trim()) return;
+    setCreatingFlow(true);
+    const res = await fetch("/api/bot-flows", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        flowName,
+        flowName: newFlowName.trim(),
         data: {
-          trigger: { type: flowTriggerType, value: flowTriggerValue },
-          startNodeId: 'step_1',
-          nodes,
+          trigger: { type: "keyword", value: "" },
+          startNodeId: "start_1",
+          nodes: [
+            { id: "start_1", type: "start", _x: 60, _y: 200, text: "Start" },
+            { id: "node_end", type: "end", _x: 400, _y: 200 },
+          ],
         },
       }),
     });
+    const json = await res.json();
+    setCreatingFlow(false);
+    setShowCreateFlow(false);
+    setNewFlowName("");
+    if (json.success && json.data) {
+      await fetchFlows();
+      setBuilderFlow(json.data);
+    }
+  }
 
-    setSavingFlow(false);
-    setShowFlowForm(false);
-    setFlowName('');
-    setFlowTriggerType('keyword');
-    setFlowTriggerValue('');
-    setSteps([{ type: 'send_text', text: defaultWelcomeMessage }, { type: 'end' }]);
+  async function handleDeleteFlow(id: string) {
+    if (!confirm(tc("confirmDelete"))) return;
+    await fetch(`/api/bot-flows/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
     fetchFlows();
   }
 
+  async function handleToggleFlowStatus(flow: Flow) {
+    await fetch(`/api/bot-flows/${encodeURIComponent(flow.id)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: flow.status === 1 ? 2 : 1 }),
+    });
+    fetchFlows();
+  }
+
+  // ── Open visual builder ──────────────────────────────────────────────────
+
+  if (builderFlow) {
+    return (
+      <FlowBuilder
+        flow={builderFlow}
+        categories={categories}
+        onClose={() => setBuilderFlow(null)}
+        onSaved={() => {
+          setBuilderFlow(null);
+          fetchFlows();
+        }}
+      />
+    );
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+
   return (
     <div>
+      {/* Page Header */}
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
-        <div className="flex rounded-lg border border-gray-300 bg-white p-1 text-sm">
-          <button onClick={() => setTab('replies')} className={`rounded-md px-3 py-1.5 ${tab === 'replies' ? 'bg-emerald-600 text-white' : 'text-gray-600'}`}>
-            {t('quickReplies')}
+        <h1 className="text-2xl font-bold text-gray-900">{t("title")}</h1>
+        <div className="flex rounded-lg border border-gray-300 bg-white p-1 text-sm shadow-sm">
+          <button
+            onClick={() => setTab("replies")}
+            className={`rounded-md px-4 py-1.5 font-medium transition-colors ${tab === "replies" ? "bg-emerald-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-50"}`}
+          >
+            {t("quickReplies")}
           </button>
-          <button onClick={() => setTab('flows')} className={`rounded-md px-3 py-1.5 ${tab === 'flows' ? 'bg-emerald-600 text-white' : 'text-gray-600'}`}>
-            {t('flowBuilder')}
+          <button
+            onClick={() => setTab("flows")}
+            className={`rounded-md px-4 py-1.5 font-medium transition-colors ${tab === "flows" ? "bg-emerald-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-50"}`}
+          >
+            {t("flowBuilder")}
           </button>
         </div>
       </div>
 
-      {tab === 'replies' && (
+      {/* ═══════════════ QUICK REPLIES TAB ═══════════════ */}
+      {tab === "replies" && (
         <div>
-          <div className="mb-4 flex justify-end">
-            <button onClick={() => setShowReplyForm(true)} className="rounded-lg bg-green-500 px-4 py-2 text-sm text-white hover:bg-green-600">
-              {t('createBotReply')}
+          {/* Toolbar */}
+          <div className="mb-5 flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              {replies.length} repl{replies.length !== 1 ? "ies" : "y"}{" "}
+              configured
+            </p>
+            <button
+              onClick={openCreateForm}
+              className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              <span className="text-base leading-none">+</span>
+              {t("createBotReply")}
             </button>
           </div>
 
-          {showReplyForm && (
-            <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 font-semibold text-gray-900">{t('createBotReply')}</h2>
-              <form onSubmit={handleCreateReply} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">{t('replyName')}</label>
-                  <input value={replyForm.replyName} onChange={e => setReplyForm({ ...replyForm, replyName: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">{t('triggerType')}</label>
-                  <select value={replyForm.triggerType} onChange={e => setReplyForm({ ...replyForm, triggerType: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                    {triggerTypes.map(tt => <option key={tt} value={tt}>{tt}</option>)}
-                  </select>
-                </div>
-                {replyForm.triggerType !== 'welcome' && (
+          {/* ── Reply Form ── */}
+          {showForm && (
+            <div className="mb-6 rounded-2xl border border-gray-200 bg-white shadow-md overflow-hidden">
+              {/* Form header */}
+              <div
+                className={`px-6 py-4 flex items-center justify-between ${editingReply ? "bg-blue-600" : "bg-emerald-600"}`}
+              >
+                <h2 className="font-semibold text-white text-base">
+                  {editingReply ? "✏️ Edit Bot Reply" : "➕ Create Bot Reply"}
+                </h2>
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="text-white/70 hover:text-white transition-colors text-xl leading-none"
+                >
+                  ×
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveReply} className="p-6 space-y-5">
+                {/* Row 1: Name + Trigger type */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">{t('triggerSubject')}</label>
-                    <input value={replyForm.triggerSubject} onChange={e => setReplyForm({ ...replyForm, triggerSubject: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      Reply Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      value={form.replyName}
+                      onChange={(e) =>
+                        setForm({ ...form, replyName: e.target.value })
+                      }
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                      placeholder="e.g. Technical Support"
+                      required
+                    />
                   </div>
-                )}
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      Trigger Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={form.triggerType}
+                      onChange={(e) =>
+                        setForm({ ...form, triggerType: e.target.value })
+                      }
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    >
+                      {TRIGGER_TYPES.map((tt) => (
+                        <option key={tt} value={tt}>
+                          {TRIGGER_LABELS[tt] ?? tt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Trigger keyword (hidden for welcome) */}
+                {form.triggerType !== "welcome" &&
+                  ![
+                    "start_ai_bot",
+                    "stop_ai_bot",
+                    "start_promotional",
+                    "stop_promotional",
+                  ].includes(form.triggerType) && (
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                        Trigger Keyword
+                      </label>
+                      <input
+                        value={form.triggerSubject}
+                        onChange={(e) =>
+                          setForm({ ...form, triggerSubject: e.target.value })
+                        }
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                        placeholder={
+                          form.triggerType === "is"
+                            ? "Exact text to match…"
+                            : form.triggerType === "starts_with"
+                              ? "Text user message should start with…"
+                              : "Enter keyword…"
+                        }
+                      />
+                    </div>
+                  )}
+
+                {/* Reply type */}
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">{t('replyType')}</label>
-                  <select value={replyForm.replyType} onChange={e => setReplyForm({ ...replyForm, replyType: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                    <option value="text">{t('textReply')}</option>
-                    <option value="buttons">{t('buttonsReply')}</option>
-                    <option value="list">{t('listReply')}</option>
-                  </select>
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    Reply Type
+                  </label>
+                  <div className="flex gap-2">
+                    {(["text", "buttons", "list"] as const).map((rt) => (
+                      <button
+                        key={rt}
+                        type="button"
+                        onClick={() =>
+                          setForm({ ...form, replyType: rt, options: [] })
+                        }
+                        className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                          form.replyType === rt
+                            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                            : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100"
+                        }`}
+                      >
+                        {rt === "text"
+                          ? "📝 Text"
+                          : rt === "buttons"
+                            ? "🔘 Buttons"
+                            : "📋 List"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">{t('replyMessage')}</label>
-                  <textarea value={replyForm.replyMessage} onChange={e => setReplyForm({ ...replyForm, replyMessage: e.target.value })} rows={3} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+
+                {/* Reply message */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    Reply Message
+                    {form.replyType !== "text" && (
+                      <span className="ml-1 font-normal text-gray-400 text-xs">
+                        (header text above options)
+                      </span>
+                    )}
+                  </label>
+                  <textarea
+                    value={form.replyMessage}
+                    onChange={(e) =>
+                      setForm({ ...form, replyMessage: e.target.value })
+                    }
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 resize-none"
+                    placeholder="Type your reply message here…"
+                  />
                 </div>
-                {replyForm.replyType !== 'text' && (
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">{t('optionsCommaSeparated')}</label>
-                    <input value={replyForm.optionsText} onChange={e => setReplyForm({ ...replyForm, optionsText: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder={t('optionsPlaceholder')} />
+
+                {/* ── Dynamic Options ── */}
+                {(form.replyType === "buttons" ||
+                  form.replyType === "list") && (
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <label className="text-sm font-semibold text-gray-700">
+                        {form.replyType === "buttons"
+                          ? "🔘 Buttons"
+                          : "📋 List Rows"}
+                        <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-500">
+                          {form.options.length}
+                          {form.replyType === "buttons" ? "/3 max" : ""}
+                        </span>
+                      </label>
+                      {(form.replyType !== "buttons" ||
+                        form.options.length < 3) && (
+                        <button
+                          type="button"
+                          onClick={addOption}
+                          className="flex items-center gap-1 rounded-lg border border-dashed border-emerald-400 px-3 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 transition-colors"
+                        >
+                          + Add{" "}
+                          {form.replyType === "buttons" ? "Button" : "Row"}
+                        </button>
+                      )}
+                    </div>
+
+                    {form.options.length === 0 && (
+                      <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 py-6 text-center text-sm text-gray-400">
+                        No {form.replyType === "buttons" ? "buttons" : "rows"}{" "}
+                        yet.{" "}
+                        <button
+                          type="button"
+                          onClick={addOption}
+                          className="text-emerald-600 hover:underline"
+                        >
+                          Add one
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      {form.options.map((opt, idx) => (
+                        <div
+                          key={opt.id}
+                          className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                        >
+                          {/* Drag handle / number */}
+                          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-500">
+                            {idx + 1}
+                          </span>
+
+                          <input
+                            type="text"
+                            value={opt.title}
+                            onChange={(e) =>
+                              updateOption(opt.id, e.target.value)
+                            }
+                            placeholder={
+                              form.replyType === "buttons"
+                                ? "Button label…"
+                                : "Row title…"
+                            }
+                            maxLength={form.replyType === "buttons" ? 20 : 24}
+                            className="flex-1 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-100"
+                          />
+
+                          {/* Character count */}
+                          <span
+                            className={`text-xs tabular-nums flex-shrink-0 ${opt.title.length >= (form.replyType === "buttons" ? 18 : 22) ? "text-orange-500" : "text-gray-400"}`}
+                          >
+                            {opt.title.length}/
+                            {form.replyType === "buttons" ? 20 : 24}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => removeOption(opt.id)}
+                            className="flex-shrink-0 rounded-md p-1 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                            title="Remove"
+                          >
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 14 14"
+                              fill="none"
+                            >
+                              <path
+                                d="M1 1l12 12M13 1L1 13"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* List button text */}
+                    {form.replyType === "list" && (
+                      <div className="mt-3">
+                        <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          List Button Label
+                        </label>
+                        <input
+                          value={form.buttonText}
+                          onChange={(e) =>
+                            setForm({ ...form, buttonText: e.target.value })
+                          }
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                          placeholder="View Options"
+                          maxLength={20}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
-                <div className="md:col-span-2 flex gap-2">
-                  <button type="submit" disabled={savingReply} className="rounded-lg bg-green-500 px-4 py-2 text-sm text-white hover:bg-green-600 disabled:opacity-60">{savingReply ? tc('saving') : tc('save')}</button>
-                  <button type="button" onClick={() => setShowReplyForm(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">{tc('cancel')}</button>
+
+                {/* Action buttons */}
+                <div className="flex gap-3 border-t border-gray-100 pt-4">
+                  <button
+                    type="submit"
+                    disabled={savingReply}
+                    className="flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm"
+                  >
+                    {savingReply ? (
+                      <>
+                        <span className="animate-spin">⟳</span> {tc("saving")}
+                      </>
+                    ) : (
+                      <>
+                        {editingReply ? "✅ Update Reply" : "✅ Create Reply"}
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    {tc("cancel")}
+                  </button>
                 </div>
               </form>
             </div>
           )}
 
+          {/* ── Reply List ── */}
+          {loadingReplies && (
+            <div className="flex items-center justify-center py-16 text-gray-400">
+              <span className="animate-spin mr-2 text-xl">⟳</span> Loading…
+            </div>
+          )}
+          {!loadingReplies && replies.length === 0 && (
+            <div className="rounded-2xl border border-gray-100 bg-white py-16 text-center shadow-sm">
+              <p className="mb-2 text-4xl">🤖</p>
+              <p className="font-semibold text-gray-600">
+                No quick replies yet
+              </p>
+              <p className="mt-1 text-sm text-gray-400">
+                Create your first bot reply to automate responses
+              </p>
+              <button
+                onClick={openCreateForm}
+                className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+              >
+                Create First Reply
+              </button>
+            </div>
+          )}
+
           <div className="space-y-3">
-            {loadingReplies && <div className="py-8 text-center text-gray-400">{tc('loading')}</div>}
-            {!loadingReplies && replies.length === 0 && <div className="rounded-xl border border-gray-100 bg-white py-12 text-center text-gray-400">{tc('noData')}</div>}
-            {replies.map((r) => (
-              <div key={r.id} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-semibold text-gray-900">{r.replyName}</span>
-                    <div className="mt-1 flex gap-2">
-                      <span className="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-700">{r.triggerType}</span>
-                      {r.triggerSubject && <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">"{r.triggerSubject}"</span>}
-                      <span className="rounded bg-green-50 px-2 py-0.5 text-xs text-green-700">{r.replyType}</span>
+            {replies.map((r) => {
+              const rData = r.data ?? {};
+              const buttons = rData.buttons ?? [];
+              const sections = rData.sections ?? [];
+              const rows = sections[0]?.rows ?? [];
+
+              return (
+                <div
+                  key={r.id}
+                  className="rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+                >
+                  {/* Card header */}
+                  <div className="flex items-center justify-between px-5 py-3.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Type icon */}
+                      <span className="text-lg flex-shrink-0">
+                        {r.replyType === "buttons"
+                          ? "🔘"
+                          : r.replyType === "list"
+                            ? "📋"
+                            : "💬"}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">
+                          {r.replyName}
+                        </p>
+                        <div className="mt-1 flex flex-wrap gap-1.5 items-center">
+                          {/* Trigger badge */}
+                          <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-100">
+                            {TRIGGER_LABELS[r.triggerType] ?? r.triggerType}
+                          </span>
+                          {r.triggerSubject && (
+                            <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 border border-gray-200">
+                              "{r.triggerSubject}"
+                            </span>
+                          )}
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${
+                              r.replyType === "buttons"
+                                ? "bg-indigo-50 text-indigo-700 border-indigo-100"
+                                : r.replyType === "list"
+                                  ? "bg-amber-50 text-amber-700 border-amber-100"
+                                  : "bg-green-50 text-green-700 border-green-100"
+                            }`}
+                          >
+                            {r.replyType}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                      <button
+                        onClick={() => handleToggleReplyStatus(r)}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                          r.status === 1
+                            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        }`}
+                      >
+                        {r.status === 1 ? "● Active" : "○ Inactive"}
+                      </button>
+                      <button
+                        onClick={() => openEditForm(r)}
+                        className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteReply(r.id)}
+                        className="rounded-lg bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors"
+                      >
+                        {tc("delete")}
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleToggleReplyStatus(r)}
-                      className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${r.status === 1 ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                    >
-                      {r.status === 1 ? tc('active') : tc('inactive')}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteReply(r.id)}
-                      className="rounded-lg bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors"
-                    >
-                      {tc('delete')}
-                    </button>
-                  </div>
+
+                  {/* Reply message preview */}
+                  {r.replyMessage && (
+                    <div className="px-5 pb-2">
+                      <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600 border border-gray-100 line-clamp-2">
+                        {r.replyMessage}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Button options preview */}
+                  {r.replyType === "buttons" && buttons.length > 0 && (
+                    <div className="px-5 pb-4 pt-1 flex flex-wrap gap-2">
+                      {buttons.map((b: any) => (
+                        <span
+                          key={b.id}
+                          className="inline-flex items-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700"
+                        >
+                          🔘 {b.title}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* List rows preview */}
+                  {r.replyType === "list" && rows.length > 0 && (
+                    <div className="px-5 pb-4">
+                      <p className="mb-1.5 text-xs font-medium text-gray-400 uppercase tracking-wide">
+                        Rows
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {rows.map((row: any) => (
+                          <span
+                            key={row.id}
+                            className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700"
+                          >
+                            📋 {row.title}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {r.replyMessage && <p className="mt-2 truncate text-sm text-gray-600">{r.replyMessage}</p>}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {tab === 'flows' && (
+      {/* ═══════════════ FLOWS TAB ═══════════════ */}
+      {tab === "flows" && (
         <div>
-          <div className="mb-4 flex justify-end">
-            <button onClick={() => setShowFlowForm(true)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700">
-              {t('createFlow')}
+          {/* Toolbar */}
+          <div className="mb-5 flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              {flows.length} flow{flows.length !== 1 ? "s" : ""} ·{" "}
+              {categories.length} categor{categories.length !== 1 ? "ies" : "y"}
+            </p>
+            <button
+              onClick={() => setShowCreateFlow(true)}
+              className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              <span className="text-base leading-none">+</span>
+              {t("createFlow")}
             </button>
           </div>
 
-          {showFlowForm && (
-            <form onSubmit={createFlow} className="mb-6 rounded-2xl border border-emerald-100 bg-white p-6">
-              <h2 className="mb-4 text-lg font-semibold text-gray-900">{t('noCodeFlowBuilder')}</h2>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">{t('flowName')}</label>
-                  <input value={flowName} onChange={(e) => setFlowName(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">{t('trigger')}</label>
-                  <select value={flowTriggerType} onChange={(e) => setFlowTriggerType(e.target.value as any)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                    <option value="keyword">{t('keyword')}</option>
-                    <option value="welcome">{t('welcome')}</option>
-                    <option value="any">{t('anyMessage')}</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">{t('triggerValue')}</label>
-                  <input value={flowTriggerValue} onChange={(e) => setFlowTriggerValue(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder={t('triggerValuePlaceholder')} />
-                </div>
-              </div>
+          {/* Create flow dialog */}
+          {showCreateFlow && (
+            <div className="mb-6 rounded-2xl border border-emerald-200 bg-white p-6 shadow-md">
+              <h2 className="mb-4 font-semibold text-gray-900 text-base">
+                New Bot Flow
+              </h2>
+              <form onSubmit={handleCreateFlow} className="flex gap-3">
+                <input
+                  value={newFlowName}
+                  onChange={(e) => setNewFlowName(e.target.value)}
+                  placeholder="Flow name…"
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  required
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  disabled={creatingFlow}
+                  className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {creatingFlow ? "Creating…" : "Create & Open Builder →"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateFlow(false)}
+                  className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  {tc("cancel")}
+                </button>
+              </form>
+            </div>
+          )}
 
-              <div className="mt-5 space-y-3">
-                {steps.map((step, index) => (
-                  <div key={index} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-gray-800">{t('step')} {index + 1}</span>
-                      <div className="flex gap-1">
-                        <button type="button" onClick={() => moveStep(index, -1)} className="rounded border border-gray-300 px-2 py-0.5 text-xs">{t('up')}</button>
-                        <button type="button" onClick={() => moveStep(index, 1)} className="rounded border border-gray-300 px-2 py-0.5 text-xs">{t('down')}</button>
-                        <button type="button" onClick={() => setSteps((prev) => prev.filter((_, idx) => idx !== index))} className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600">{t('remove')}</button>
-                      </div>
+          {/* Loading */}
+          {loadingFlows && (
+            <div className="flex items-center justify-center py-16 text-gray-400">
+              <span className="animate-spin mr-2 text-xl">⟳</span> Loading…
+            </div>
+          )}
+
+          {/* Empty */}
+          {!loadingFlows && flows.length === 0 && (
+            <div className="rounded-2xl border border-gray-100 bg-white py-16 text-center shadow-sm">
+              <p className="mb-2 text-4xl">🤖</p>
+              <p className="font-semibold text-gray-600">No bot flows yet</p>
+              <p className="mt-1 text-sm text-gray-400">
+                Create a flow to build visual chatbot conversations
+              </p>
+              <button
+                onClick={() => setShowCreateFlow(true)}
+                className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+              >
+                Create First Flow
+              </button>
+            </div>
+          )}
+
+          {/* Flow cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {flows.map((flow) => {
+              const assignedCategory = flow.jobCategoryId
+                ? categories.find((c) => c.id === flow.jobCategoryId)
+                : null;
+              const nodeCount = Array.isArray(flow.data?.nodes)
+                ? flow.data.nodes.length
+                : 0;
+              const triggerType = flow.data?.trigger?.type ?? "keyword";
+              const triggerValue = flow.data?.trigger?.value ?? "";
+
+              return (
+                <div
+                  key={flow.id}
+                  className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col"
+                >
+                  {/* Card header */}
+                  <div className="bg-gradient-to-r from-emerald-600 to-teal-500 px-4 py-3.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-white text-lg">🔀</span>
+                      <span className="text-white font-semibold text-sm truncate">
+                        {flow.flowName}
+                      </span>
                     </div>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <select
-                        value={step.type}
-                        onChange={(e) => {
-                          const value = e.target.value as FlowStep['type'];
-                          setSteps((prev) => prev.map((s, idx) => idx === index ? { ...s, type: value } : s));
-                        }}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                      >
-                        <option value="send_text">{t('sendText')}</option>
-                        <option value="send_buttons">{t('sendButtons')}</option>
-                        <option value="send_list">{t('sendList')}</option>
-                        <option value="condition_text">{t('condition')}</option>
-                        <option value="end">{t('end')}</option>
-                      </select>
-                      {step.type === 'condition_text' && (
-                        <select
-                          value={step.operator ?? 'contains'}
-                          onChange={(e) =>
-                            setSteps((prev) => prev.map((s, idx) => idx === index ? { ...s, operator: e.target.value as any } : s))
-                          }
-                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    <span
+                      className={`flex-shrink-0 text-xs px-2.5 py-0.5 rounded-full font-semibold ${
+                        flow.status === 1
+                          ? "bg-white/25 text-white"
+                          : "bg-black/20 text-white/70"
+                      }`}
+                    >
+                      {flow.status === 1 ? "● Active" : "○ Paused"}
+                    </span>
+                  </div>
+
+                  {/* Card body */}
+                  <div className="px-4 py-3 flex-1 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-gray-400">Trigger:</span>
+                      <span className="rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                        {triggerType}
+                      </span>
+                      {triggerValue && (
+                        <span className="text-xs text-gray-500 truncate max-w-[100px]">
+                          "{triggerValue}"
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400">Nodes:</span>
+                      <span className="text-xs font-semibold text-gray-700">
+                        {nodeCount}
+                      </span>
+                    </div>
+                    {assignedCategory && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400">Category:</span>
+                        <span
+                          className="rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
+                          style={{ background: assignedCategory.color }}
                         >
-                          <option value="contains">{t('contains')}</option>
-                          <option value="equals">{t('equals')}</option>
-                          <option value="starts_with">{t('startsWith')}</option>
-                          <option value="ends_with">{t('endsWith')}</option>
-                        </select>
-                      )}
-                      {(step.type === 'send_text' || step.type === 'send_buttons' || step.type === 'send_list') && (
-                        <input
-                          value={step.text ?? ''}
-                          onChange={(e) => setSteps((prev) => prev.map((s, idx) => idx === index ? { ...s, text: e.target.value } : s))}
-                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
-                          placeholder={t('messageText')}
-                        />
-                      )}
-                      {step.type === 'condition_text' && (
-                        <input
-                          value={step.conditionValue ?? ''}
-                          onChange={(e) => setSteps((prev) => prev.map((s, idx) => idx === index ? { ...s, conditionValue: e.target.value } : s))}
-                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
-                          placeholder={t('conditionValue')}
-                        />
-                      )}
-                      {(step.type === 'send_buttons' || step.type === 'send_list') && (
-                        <input
-                          value={step.optionsText ?? ''}
-                          onChange={(e) => setSteps((prev) => prev.map((s, idx) => idx === index ? { ...s, optionsText: e.target.value } : s))}
-                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
-                          placeholder={t('optionsStepPlaceholder')}
-                        />
-                      )}
-                    </div>
+                          {assignedCategory.name}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card actions */}
+                  <div className="border-t border-gray-100 px-4 py-2.5 flex items-center gap-2">
+                    <button
+                      onClick={() => setBuilderFlow(flow)}
+                      className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      ✏️ Open Builder
+                    </button>
+                    <button
+                      onClick={() => handleToggleFlowStatus(flow)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                        flow.status === 1
+                          ? "bg-yellow-50 text-yellow-700 hover:bg-yellow-100"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {flow.status === 1 ? "Pause" : "Activate"}
+                    </button>
+                    <div className="flex-1" />
+                    <button
+                      onClick={() => handleDeleteFlow(flow.id)}
+                      className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors"
+                    >
+                      {tc("delete")}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Categories info */}
+          {categories.length > 0 && (
+            <div className="mt-8 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold text-gray-700">
+                📂 Job Categories for Chat Routing
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {categories.map((cat) => (
+                  <div
+                    key={cat.id}
+                    className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs shadow-sm"
+                  >
+                    <div
+                      className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                      style={{ background: cat.color }}
+                    />
+                    <span className="font-medium text-gray-700">
+                      {cat.name}
+                    </span>
                   </div>
                 ))}
               </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button type="button" onClick={() => setSteps((prev) => [...prev, { type: 'send_text', text: '' }])} className="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">+ {t('textReply')}</button>
-                <button type="button" onClick={() => setSteps((prev) => [...prev, { type: 'send_buttons', text: '', optionsText: '' }])} className="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">+ {t('buttonsReply')}</button>
-                <button type="button" onClick={() => setSteps((prev) => [...prev, { type: 'send_list', text: '', optionsText: '' }])} className="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">+ {t('listReply')}</button>
-                <button type="button" onClick={() => setSteps((prev) => [...prev, { type: 'condition_text', conditionValue: '', operator: 'contains' }])} className="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">+ {t('condition')}</button>
-                <button type="button" onClick={() => setSteps((prev) => [...prev, { type: 'end' }])} className="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">+ {t('end')}</button>
-              </div>
-
-              <div className="mt-4 flex gap-2">
-                <button type="submit" disabled={!canSaveFlow || savingFlow} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-60">
-                  {savingFlow ? tc('saving') : t('saveFlow')}
-                </button>
-                <button type="button" onClick={() => setShowFlowForm(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
-                  {tc('cancel')}
-                </button>
-              </div>
-            </form>
+              <p className="mt-3 text-xs text-gray-400">
+                In the flow builder, assign a category to a button or list row.
+                When a user taps that option, the chat is automatically routed
+                to an available employee in that category.
+              </p>
+            </div>
           )}
-
-          <div className="space-y-3">
-            {loadingFlows && <div className="py-8 text-center text-gray-400">{tc('loading')}</div>}
-            {!loadingFlows && flows.length === 0 && <div className="rounded-xl border border-gray-100 bg-white py-12 text-center text-gray-400">{tc('noData')}</div>}
-            {flows.map((flow) => (
-              <div key={flow.id} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-900">{flow.flowName}</p>
-                    <p className="mt-1 text-xs text-gray-500">{flow.description || t('noDescription')}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleToggleFlowStatus(flow)}
-                      className={`rounded-full px-3 py-0.5 text-xs font-medium transition-colors ${flow.status === 1 ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                    >
-                      {flow.status === 1 ? tc('active') : tc('inactive')}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteFlow(flow.id)}
-                      className="rounded-lg bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors"
-                    >
-                      {tc('delete')}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       )}
     </div>

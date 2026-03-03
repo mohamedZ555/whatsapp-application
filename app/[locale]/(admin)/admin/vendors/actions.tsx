@@ -15,6 +15,7 @@ type VendorActionsCellProps = {
   adminUserStatus: number | null;
   subscriptionPlanId?: string | null;
   subscriptionPlanTitle?: string;
+  planDisabledPerms?: string[];
   vendorStats?: {
     totalUsers: number;
     totalEmployees: number;
@@ -23,13 +24,23 @@ type VendorActionsCellProps = {
   onRefresh: () => void;
 };
 
-type ModalState = 'none' | 'edit' | 'password' | 'plan' | 'details' | 'employees';
+type ModalState = 'none' | 'edit' | 'password' | 'plan' | 'details' | 'employees' | 'adminPerms';
 
 const AVAILABLE_PLANS = [
   { id: 'free', label: 'Free' },
   { id: 'plan_1', label: 'Standard' },
   { id: 'plan_2', label: 'Premium' },
   { id: 'plan_3', label: 'Ultimate' },
+];
+
+const ALL_PERMISSIONS: { key: string; label: string; desc: string }[] = [
+  { key: 'manage_contacts',  label: 'Manage Contacts',  desc: 'Create, edit, delete contacts' },
+  { key: 'manage_campaigns', label: 'Manage Campaigns', desc: 'Create and send campaigns' },
+  { key: 'manage_templates', label: 'Manage Templates', desc: 'Create and edit message templates' },
+  { key: 'manage_bot_replies', label: 'Manage Bot Replies', desc: 'Configure automated bot replies' },
+  { key: 'manage_chat',     label: 'Manage Chat',     desc: 'Access and reply to live chats' },
+  { key: 'view_message_log', label: 'View Message Log', desc: 'Read message history and logs' },
+  { key: 'manage_users',    label: 'Manage Users',    desc: 'Invite and manage team members' },
 ];
 
 type Employee = {
@@ -40,6 +51,7 @@ type Employee = {
   username: string;
   status: number;
   mobileNumber: string | null;
+  roleId?: number;
   vendorUserDetail: { jobCategoryId: string | null; permissions: string[] | null } | null;
 };
 
@@ -71,6 +83,7 @@ export function VendorActionsCell({
   adminUserStatus,
   subscriptionPlanId,
   subscriptionPlanTitle,
+  planDisabledPerms = [],
   vendorStats,
   onRefresh,
 }: VendorActionsCellProps) {
@@ -97,6 +110,18 @@ export function VendorActionsCell({
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [empLoading, setEmpLoading] = useState(false);
+
+  // Permissions editor state
+  const [permTarget, setPermTarget] = useState<Employee | null>(null);
+  const [permChecked, setPermChecked] = useState<string[]>([]);
+  const [permSaving, setPermSaving] = useState(false);
+  const [permError, setPermError] = useState('');
+
+  // Admin user state (for admin permissions)
+  const [adminUser, setAdminUser] = useState<Employee | null>(null);
+  const [adminPermsChecked, setAdminPermsChecked] = useState<string[]>([]);
+  const [adminPermSaving, setAdminPermSaving] = useState(false);
+  const [adminPermError, setAdminPermError] = useState('');
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -225,6 +250,79 @@ export function VendorActionsCell({
     } catch { setEmployees([]); }
     finally { setEmpLoading(false); }
   }, [vendor.id]);
+
+  const openAdminPerms = useCallback(async () => {
+    setModal('adminPerms');
+    setAdminPermError('');
+    setAdminPermSaving(false);
+    try {
+      const res = await fetch(`/api/users?vendorId=${vendor.id}&roleId=2`);
+      const data = await res.json();
+      const admin: Employee | undefined = Array.isArray(data) ? data[0] : undefined;
+      if (admin) {
+        setAdminUser(admin);
+        setAdminPermsChecked((admin.vendorUserDetail?.permissions as string[]) ?? []);
+      } else {
+        setAdminUser(null);
+        setAdminPermsChecked([]);
+      }
+    } catch { setAdminUser(null); }
+  }, [vendor.id]);
+
+  function openEmpPerms(emp: Employee) {
+    setPermTarget(emp);
+    setPermChecked((emp.vendorUserDetail?.permissions as string[]) ?? []);
+    setPermError('');
+    setPermSaving(false);
+  }
+
+  function togglePerm(key: string, checked: string[], set: (v: string[]) => void) {
+    set(checked.includes(key) ? checked.filter((k) => k !== key) : [...checked, key]);
+  }
+
+  async function saveEmpPerms() {
+    if (!permTarget) return;
+    setPermSaving(true);
+    setPermError('');
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: permTarget.id, permissions: permChecked }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEmployees((prev) => prev.map((e) => e.id === permTarget.id
+          ? { ...e, vendorUserDetail: { ...e.vendorUserDetail, permissions: permChecked, jobCategoryId: e.vendorUserDetail?.jobCategoryId ?? null } }
+          : e
+        ));
+        setPermTarget(null);
+      } else {
+        setPermError(data.error ?? 'Failed to save');
+      }
+    } catch { setPermError('Network error'); }
+    finally { setPermSaving(false); }
+  }
+
+  async function saveAdminPerms() {
+    if (!adminUser) return;
+    setAdminPermSaving(true);
+    setAdminPermError('');
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: adminUser.id, permissions: adminPermsChecked }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setModal('none');
+      } else {
+        setAdminPermError(data.error ?? 'Failed to save');
+      }
+    } catch { setAdminPermError('Network error'); }
+    finally { setAdminPermSaving(false); }
+  }
 
   const modalContent = modal !== 'none' && mounted ? createPortal(
     <>
@@ -382,8 +480,8 @@ export function VendorActionsCell({
 
       {/* ── EMPLOYEES ── */}
       {modal === 'employees' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setModal('none')}>
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { if (!permTarget) setModal('none'); }}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-3xl mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4 shrink-0">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Employees</h2>
@@ -402,35 +500,175 @@ export function VendorActionsCell({
                     <tr className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
                       <th className="px-3 py-2 text-start font-semibold">Name</th>
                       <th className="px-3 py-2 text-start font-semibold">Email</th>
+                      <th className="px-3 py-2 text-start font-semibold">Phone</th>
                       <th className="px-3 py-2 text-start font-semibold">Username</th>
-                      <th className="px-3 py-2 text-start font-semibold">Job Category</th>
+                      <th className="px-3 py-2 text-start font-semibold">Permissions</th>
                       <th className="px-3 py-2 text-start font-semibold">Status</th>
+                      <th className="px-3 py-2 text-start font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {employees.map((emp) => (
-                      <tr key={emp.id} className="border-t border-slate-50 hover:bg-slate-50/50">
-                        <td className="px-3 py-2 font-medium text-slate-800">
-                          {emp.firstName} {emp.lastName}
-                        </td>
-                        <td className="px-3 py-2 text-slate-500">{emp.email}</td>
-                        <td className="px-3 py-2 text-slate-500">{emp.username}</td>
-                        <td className="px-3 py-2 text-slate-500">
-                          {(emp as any).vendorUserDetail?.jobCategory?.name ?? (
-                            <span className="text-slate-300 text-xs">Unassigned</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className={`inline-flex rounded px-2 py-0.5 text-[11px] font-semibold ${userStatusColor(emp.status)}`}>
-                            {userStatusLabel(emp.status)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {employees.map((emp) => {
+                      const empPerms = (emp.vendorUserDetail?.permissions as string[]) ?? [];
+                      return (
+                        <tr key={emp.id} className="border-t border-slate-100 hover:bg-slate-50/50">
+                          <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap">
+                            {emp.firstName} {emp.lastName}
+                          </td>
+                          <td className="px-3 py-2 text-slate-500 text-xs">{emp.email}</td>
+                          <td className="px-3 py-2 text-slate-500 text-xs">{emp.mobileNumber ?? <span className="text-slate-300">—</span>}</td>
+                          <td className="px-3 py-2 text-slate-500 text-xs">{emp.username}</td>
+                          <td className="px-3 py-2">
+                            {empPerms.length === 0 ? (
+                              <span className="text-[11px] text-slate-300">None</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-0.5 max-w-[160px]">
+                                {empPerms.slice(0, 3).map((p) => (
+                                  <span key={p} className="inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-700">
+                                    {p.replace('manage_', '').replace('view_', '')}
+                                  </span>
+                                ))}
+                                {empPerms.length > 3 && (
+                                  <span className="inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-500">+{empPerms.length - 3}</span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`inline-flex rounded px-2 py-0.5 text-[11px] font-semibold ${userStatusColor(emp.status)}`}>
+                              {userStatusLabel(emp.status)}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <button
+                              onClick={() => openEmpPerms(emp)}
+                              className="rounded bg-purple-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-purple-700"
+                            >
+                              Edit Perms
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
             </div>
+          </div>
+
+          {/* ── inline permissions editor for an employee ── */}
+          {permTarget && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30" onClick={() => setPermTarget(null)}>
+              <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-base font-semibold text-gray-900 mb-0.5">Edit Permissions</h3>
+                <p className="text-sm text-slate-500 mb-4">{permTarget.firstName} {permTarget.lastName}</p>
+                <div className="space-y-2 mb-4">
+                  {ALL_PERMISSIONS.map((perm) => {
+                    const isPlanLocked = planDisabledPerms.includes(perm.key);
+                    return (
+                      <label
+                        key={perm.key}
+                        className={`flex items-start gap-3 group ${isPlanLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!isPlanLocked && permChecked.includes(perm.key)}
+                          onChange={() => !isPlanLocked && togglePerm(perm.key, permChecked, setPermChecked)}
+                          disabled={isPlanLocked}
+                          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 disabled:cursor-not-allowed"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-slate-800 group-hover:text-purple-700">
+                            {perm.label}
+                            {isPlanLocked && <span className="ml-1.5 text-[10px] font-semibold text-amber-600 bg-amber-100 rounded px-1 py-0.5">Plan locked</span>}
+                          </p>
+                          <p className="text-xs text-slate-400">{perm.desc}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+                {permError && <p className="text-xs text-red-600 mb-3 bg-red-50 border border-red-200 rounded px-2 py-1.5">{permError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveEmpPerms}
+                    disabled={permSaving}
+                    className="flex-1 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    {permSaving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => setPermTarget(null)}
+                    className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── ADMIN PERMISSIONS ── */}
+      {modal === 'adminPerms' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setModal('none')}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-base font-semibold text-gray-900 mb-0.5">Admin Permissions</h2>
+            <p className="text-sm text-slate-500 mb-4">{vendor.title ?? vendor.uid}</p>
+            {planDisabledPerms.length > 0 && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                ⚠ Some permissions are locked by the vendor&apos;s current subscription plan and cannot be granted.
+              </p>
+            )}
+            {!adminUser ? (
+              <div className="py-6 text-center text-sm text-slate-400">No admin user found.</div>
+            ) : (
+              <>
+                <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 mb-4">
+                  Admin: <span className="font-semibold text-slate-700">{adminUser.firstName} {adminUser.lastName}</span> · {adminUser.email}
+                </p>
+                <div className="space-y-2 mb-4">
+                  {ALL_PERMISSIONS.map((perm) => {
+                    const isPlanLocked = planDisabledPerms.includes(perm.key);
+                    return (
+                      <label
+                        key={perm.key}
+                        className={`flex items-start gap-3 group ${isPlanLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!isPlanLocked && adminPermsChecked.includes(perm.key)}
+                          onChange={() => !isPlanLocked && togglePerm(perm.key, adminPermsChecked, setAdminPermsChecked)}
+                          disabled={isPlanLocked}
+                          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-slate-800 group-hover:text-emerald-700">
+                            {perm.label}
+                            {isPlanLocked && <span className="ml-1.5 text-[10px] font-semibold text-amber-600 bg-amber-100 rounded px-1 py-0.5">Plan locked</span>}
+                          </p>
+                          <p className="text-xs text-slate-400">{perm.desc}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+                {adminPermError && <p className="text-xs text-red-600 mb-3 bg-red-50 border border-red-200 rounded px-2 py-1.5">{adminPermError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveAdminPerms}
+                    disabled={adminPermSaving}
+                    className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {adminPermSaving ? 'Saving...' : 'Save Permissions'}
+                  </button>
+                  <button onClick={() => setModal('none')} className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -483,6 +721,11 @@ export function VendorActionsCell({
           <button onClick={openEmployees}
             className="rounded bg-purple-500 px-2 py-1 text-[11px] font-semibold text-white hover:bg-purple-600">
             Employees
+          </button>
+          {/* Admin Permissions */}
+          <button onClick={openAdminPerms}
+            className="rounded bg-indigo-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700">
+            Admin Perms
           </button>
           <button onClick={() => { setEditTitle(vendor.title ?? ''); setEditStatus(vendor.status); setModal('edit'); }}
             className="rounded bg-emerald-700 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-800">

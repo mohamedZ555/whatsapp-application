@@ -16,10 +16,11 @@ export function CreateVendorButton() {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
 
   function openModal() {
     setTitle(''); setFirstName(''); setLastName('');
-    setEmail(''); setUsername(''); setPassword('');
+    setEmail(''); setUsername(''); setPassword(''); setMobileNumber('');
     setError('');
     setOpen(true);
   }
@@ -32,7 +33,7 @@ export function CreateVendorButton() {
       const res = await fetch('/api/admin/vendors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, firstName, lastName, email, username, password }),
+        body: JSON.stringify({ title, firstName, lastName, email, username, password, mobileNumber }),
       });
       const data = await res.json();
       if (data.success) {
@@ -109,6 +110,13 @@ export function CreateVendorButton() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={6}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Phone number (optional)"
+                    value={mobileNumber}
+                    onChange={(e) => setMobileNumber(e.target.value)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>

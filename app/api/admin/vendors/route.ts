@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : '';
   const password = typeof body.password === 'string' ? body.password : '';
+  const mobileNumber = typeof body.mobileNumber === 'string' ? body.mobileNumber.trim() : null;
 
   if (!title) return NextResponse.json({ error: 'Vendor title is required.' }, { status: 400 });
   if (!firstName) return NextResponse.json({ error: 'First name is required.' }, { status: 400 });
@@ -99,6 +100,7 @@ export async function POST(req: NextRequest) {
           password: hashedPassword,
           roleId: USER_ROLES.VENDOR,
           status: 1,
+          mobileNumber: mobileNumber || null,
         },
       },
     },

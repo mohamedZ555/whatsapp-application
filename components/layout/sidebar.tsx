@@ -37,14 +37,21 @@ const iconMap = {
   headphones: Headphones,
 } as const;
 
-export default function Sidebar() {
+type SidebarProps = {
+  planDisabledPerms?: string[];
+  permissionsRestricted?: boolean;
+};
+
+export default function Sidebar({ planDisabledPerms = [], permissionsRestricted = false }: SidebarProps) {
   const t = useTranslations('nav');
   const pathname = usePathname();
   const { data: session } = useSession();
   const roleId = (session?.user as { roleId?: number } | undefined)?.roleId;
   const permissions = (session?.user as { permissions?: string[] } | undefined)?.permissions;
 
-  const navItems = DASHBOARD_NAV_ITEMS.filter((item) => canAccessDashboardItem(roleId, permissions, item));
+  const navItems = DASHBOARD_NAV_ITEMS.filter((item) =>
+    canAccessDashboardItem(roleId, permissions, item, planDisabledPerms, permissionsRestricted)
+  );
 
   return (
     <aside className="w-64 border-e border-emerald-800/70 bg-gradient-to-b from-emerald-950 via-emerald-900 to-emerald-950 text-emerald-50 flex flex-col">

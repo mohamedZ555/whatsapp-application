@@ -40,6 +40,8 @@ export async function proxy(request: NextRequest) {
   const isAuthenticated = !!token;
   const roleId = token?.roleId as number | undefined;
   const permissions = token?.permissions as string[] | undefined;
+  const permissionsRestricted = (token?.permissionsRestricted as boolean | undefined) ?? false;
+  const planDisabledPerms = (token?.planDisabledPerms as string[] | undefined) ?? [];
 
   if (isDashboardRoute) {
     if (!isAuthenticated) {
@@ -48,7 +50,7 @@ export async function proxy(request: NextRequest) {
     if (roleId !== USER_ROLES.SUPER_ADMIN && roleId !== USER_ROLES.VENDOR && roleId !== USER_ROLES.VENDOR_USER) {
       return NextResponse.redirect(new URL(withLocale('/login'), request.url));
     }
-    if (!canAccessVendorPath(pathWithoutLocale, roleId, permissions)) {
+    if (!canAccessVendorPath(pathWithoutLocale, roleId, permissions, planDisabledPerms, permissionsRestricted)) {
       return NextResponse.redirect(new URL(withLocale('/dashboard'), request.url));
     }
   }

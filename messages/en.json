@@ -44,6 +44,12 @@
     "invalidCredentials": "Invalid email or password.",
     "accountInactive": "Your account is inactive. Please contact support."
   },
+  "impersonation": {
+    "viewingAsVendor": "You are currently viewing as a vendor account (impersonation mode).",
+    "viewingAsEmployee": "You are currently viewing as an employee account.",
+    "returnToAdmin": "Return to Admin Panel",
+    "returnToMyAccount": "Return to My Account"
+  },
   "dashboard": {
     "title": "Dashboard",
     "welcome": "Welcome back",
@@ -57,7 +63,21 @@
     "delivered": "Delivered",
     "read": "Read",
     "failed": "Failed",
-    "noMessagesYet": "No messages yet."
+    "noMessagesYet": "No messages yet.",
+    "totalVendors": "Total Vendors",
+    "activeSubscriptions": "Active Subscriptions",
+    "platformMessageDelivery": "Platform Message Delivery",
+    "acrossAllWorkspaces": "Across all vendor workspaces",
+    "latestAcrossWorkspaces": "Latest across all workspaces",
+    "viewAll": "View all",
+    "managePlan": "Manage plan",
+    "planUsage": "Plan Usage",
+    "renews": "Renews",
+    "expired": "Expired",
+    "limitReached": "Limit reached",
+    "vendorsAwaitingApproval": "{count} vendor awaiting approval",
+    "vendorsAwaitingApprovalPlural": "{count} vendors awaiting approval",
+    "clickToReviewAndApprove": "Click to review and approve"
   },
   "contacts": {
     "title": "Contacts",
@@ -191,6 +211,7 @@
     "anyMessage": "Any Message",
     "triggerValue": "Trigger Value",
     "triggerValuePlaceholder": "pricing",
+    "step": "Step",
     "up": "Up",
     "down": "Down",
     "remove": "Remove",
@@ -259,7 +280,10 @@
     "manageBotReplies": "Manage Bot Replies",
     "manageChat": "Manage Chat",
     "viewMessageLog": "View Message Log",
-    "manageUsers": "Manage Users"
+    "manageUsers": "Manage Users",
+    "loginAsEmployee": "Login as Employee",
+    "loginAsEmployeeConfirm": "Login as this employee? You can return to your account using the banner at the top.",
+    "loginAsEmployeeSuccess": "Logged in as employee. Redirecting..."
   },
   "subscription": {
     "title": "Subscription",

@@ -1,27 +1,33 @@
-import { NextAuthOptions } from 'next-auth';
-import type { Adapter } from 'next-auth/adapters';
-import CredentialsProvider from 'next-auth/providers/credentials';
-import GoogleProvider from 'next-auth/providers/google';
-import { PrismaAdapter } from '@auth/prisma-adapter';
-import bcrypt from 'bcryptjs';
-import prisma from '@/lib/prisma';
+import { NextAuthOptions } from "next-auth";
+import type { Adapter } from "next-auth/adapters";
+import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import bcrypt from "bcryptjs";
+import prisma from "@/lib/prisma";
+import { PLANS, USER_ROLES } from "@/lib/constants";
+import { computePlanDisabledPerms } from "@/lib/access";
 
-const hasGoogleProvider = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
-const adapter: Adapter | undefined = hasGoogleProvider ? (PrismaAdapter(prisma) as Adapter) : undefined;
+const hasGoogleProvider = Boolean(
+  process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
+);
+const adapter: Adapter | undefined = hasGoogleProvider
+  ? (PrismaAdapter(prisma) as Adapter)
+  : undefined;
 
 export const authOptions: NextAuthOptions = {
   adapter,
-  session: { strategy: 'jwt' },
+  session: { strategy: "jwt" },
   pages: {
-    signIn: '/login',
-    error: '/login',
+    signIn: "/login",
+    error: "/login",
   },
   providers: [
     CredentialsProvider({
-      name: 'credentials',
+      name: "credentials",
       credentials: {
-        email: { label: 'Email', type: 'text' },
-        password: { label: 'Password', type: 'password' },
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
@@ -38,16 +44,15 @@ export const authOptions: NextAuthOptions = {
           if (!user || !user.password) return null;
           if (user.status !== 1) return null;
 
-          const isValid = await bcrypt.compare(credentials.password, user.password);
+          const isValid = await bcrypt.compare(
+            credentials.password,
+            user.password,
+          );
           if (!isValid) return null;
 
           await prisma.loginLog
-            .create({
-              data: { userId: user.id },
-            })
-            .catch(() => {
-              // Do not block login if login-log insert fails.
-            });
+            .create({ data: { userId: user.id } })
+            .catch(() => {});
 
           let vendorUid: string | null = null;
           if (user.vendorId) {
@@ -58,6 +63,28 @@ export const authOptions: NextAuthOptions = {
             vendorUid = vendor?.uid ?? null;
           }
 
+          // Determine if super admin has explicitly restricted this vendor admin's permissions.
+          // permissionsRestricted=true means the permissions array should be enforced (not bypassed).
+          const permissionsRestricted =
+            user.roleId === USER_ROLES.VENDOR &&
+            user.vendorUserDetail !== null &&
+            user.vendorUserDetail.permissions !== null;
+
+          const permissions = (user.vendorUserDetail?.permissions as string[]) ?? [];
+
+          // Compute which permissions are blocked by the vendor's current subscription plan.
+          // Stored in token so proxy.ts can enforce without a DB call.
+          let planDisabledPerms: string[] = [];
+          if (user.vendorId) {
+            const subscription = await prisma.subscription.findFirst({
+              where: { vendorId: user.vendorId, status: "active" },
+              orderBy: { createdAt: "desc" },
+            });
+            const planId = subscription?.planId ?? "free";
+            const plan = PLANS[planId as keyof typeof PLANS] ?? PLANS.free;
+            planDisabledPerms = computePlanDisabledPerms(plan.features);
+          }
+
           return {
             id: user.id,
             uid: user.uid,
@@ -66,10 +93,12 @@ export const authOptions: NextAuthOptions = {
             roleId: user.roleId,
             vendorId: user.vendorId,
             vendorUid,
-            permissions: (user.vendorUserDetail?.permissions as string[]) ?? [],
+            permissions,
+            permissionsRestricted,
+            planDisabledPerms,
           } as any;
         } catch (error) {
-          console.error('Credentials authorize error:', error);
+          console.error("Credentials authorize error:", error);
           return null;
         }
       },
@@ -92,6 +121,8 @@ export const authOptions: NextAuthOptions = {
         token.vendorId = (user as any).vendorId;
         token.vendorUid = (user as any).vendorUid;
         token.permissions = (user as any).permissions;
+        token.permissionsRestricted = (user as any).permissionsRestricted;
+        token.planDisabledPerms = (user as any).planDisabledPerms;
       }
       return token;
     },
@@ -103,6 +134,8 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).vendorId = token.vendorId;
         (session.user as any).vendorUid = token.vendorUid;
         (session.user as any).permissions = token.permissions;
+        (session.user as any).permissionsRestricted = token.permissionsRestricted;
+        (session.user as any).planDisabledPerms = token.planDisabledPerms;
       }
       return session;
     },

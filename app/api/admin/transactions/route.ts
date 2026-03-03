@@ -24,6 +24,10 @@ export async function GET(req: NextRequest) {
   const type = searchParams.get('type') ?? '';
   const vendorId = searchParams.get('vendorId') ?? '';
 
+  const dateFrom = searchParams.get('dateFrom') ?? '';
+  const dateTo = searchParams.get('dateTo') ?? '';
+  const period = searchParams.get('period') ?? '';
+
   const where: any = {};
   if (status) where.status = status;
   if (type) where.type = type;
@@ -35,6 +39,30 @@ export async function GET(req: NextRequest) {
         { slug: { contains: search, mode: 'insensitive' } },
       ],
     };
+  }
+
+  // Date range filtering
+  const now = new Date();
+  let fromDate: Date | null = null;
+  let toDate: Date | null = null;
+
+  if (period === 'week') {
+    fromDate = new Date(now);
+    fromDate.setDate(now.getDate() - now.getDay()); // start of this week (Sunday)
+    fromDate.setHours(0, 0, 0, 0);
+  } else if (period === 'month') {
+    fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (period === 'year') {
+    fromDate = new Date(now.getFullYear(), 0, 1);
+  } else {
+    if (dateFrom) { fromDate = new Date(dateFrom); fromDate.setHours(0, 0, 0, 0); }
+    if (dateTo) { toDate = new Date(dateTo); toDate.setHours(23, 59, 59, 999); }
+  }
+
+  if (fromDate || toDate) {
+    where.createdAt = {};
+    if (fromDate) where.createdAt.gte = fromDate;
+    if (toDate) where.createdAt.lte = toDate;
   }
 
   const [transactions, total] = await Promise.all([

@@ -171,7 +171,7 @@ export default function ChatPage({ params }: { params: Promise<{ contactId?: str
   ];
 
   return (
-    <div className="flex h-full -m-6 overflow-hidden">
+    <div className="flex h-full rounded-xl border border-gray-200 overflow-hidden">
       {/* Contacts Sidebar */}
       <div className="w-72 bg-white border-e border-gray-200 flex flex-col flex-shrink-0">
         <div className="p-4 border-b border-gray-100">

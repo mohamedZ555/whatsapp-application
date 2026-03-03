@@ -230,6 +230,9 @@ export default function AdminTransactionsPage() {
   const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [period, setPeriod] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editTx, setEditTx] = useState<Transaction | null>(null);
@@ -243,13 +246,18 @@ export default function AdminTransactionsPage() {
       const params = new URLSearchParams({ page: String(page), limit: String(limit), search });
       if (statusFilter) params.set('status', statusFilter);
       if (typeFilter) params.set('type', typeFilter);
+      if (period) params.set('period', period);
+      else {
+        if (dateFrom) params.set('dateFrom', dateFrom);
+        if (dateTo) params.set('dateTo', dateTo);
+      }
       const res = await fetch(`/api/admin/transactions?${params}`);
       const data = await res.json();
       setTransactions(data.transactions ?? []);
       setTotal(data.total ?? 0);
     } catch { /* ignore */ }
     finally { setLoading(false); }
-  }, [page, limit, search, statusFilter, typeFilter]);
+  }, [page, limit, search, statusFilter, typeFilter, period, dateFrom, dateTo]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -259,8 +267,20 @@ export default function AdminTransactionsPage() {
       const res = await fetch(`/api/admin/transactions?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) fetchData();
-      else alert(data.error ?? 'Error');
-    } catch { alert('Error'); }
+      else alert(data.error ?? 'Delete failed');
+    } catch (err) { alert('Network error: ' + String(err)); }
+  }
+
+  function handlePeriod(p: string) {
+    setPeriod(p === period ? '' : p);
+    setDateFrom('');
+    setDateTo('');
+    setPage(1);
+  }
+
+  function handleDateRange() {
+    setPeriod('');
+    setPage(1);
   }
 
   function handleSearch(e: React.FormEvent) {
@@ -307,56 +327,100 @@ export default function AdminTransactionsPage() {
 
       <section className="rounded-md border border-emerald-100 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 px-4 py-4">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-            <span>Show</span>
-            <select
-              value={limit}
-              onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-              className="rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
-            >
-              {PAGE_LIMITS.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              className="rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
-            >
-              <option value="">All Statuses</option>
-              {['pending', 'completed', 'failed', 'refunded'].map((s) => (
-                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-              ))}
-            </select>
-            <select
-              value={typeFilter}
-              onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
-              className="rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
-            >
-              <option value="">All Types</option>
-              {['subscription', 'manual', 'refund', 'credit', 'debit'].map((t) => (
-                <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
-              ))}
-            </select>
+        <div className="flex flex-col gap-3 border-b border-emerald-100 px-4 py-4">
+          {/* Row 1: basic filters + search */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+              <span>Show</span>
+              <select
+                value={limit}
+                onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                className="rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
+              >
+                {PAGE_LIMITS.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                className="rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
+              >
+                <option value="">All Statuses</option>
+                {['pending', 'completed', 'failed', 'refunded'].map((s) => (
+                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                ))}
+              </select>
+              <select
+                value={typeFilter}
+                onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+                className="rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
+              >
+                <option value="">All Types</option>
+                {['subscription', 'manual', 'refund', 'credit', 'debit'].map((t) => (
+                  <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+            <form onSubmit={handleSearch} className="flex items-center gap-2">
+              <span className="text-sm text-slate-600">Search vendor:</span>
+              <input
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="w-[200px] rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
+                placeholder="Vendor name..."
+              />
+              <button type="submit"
+                className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                Search
+              </button>
+              {search && (
+                <button type="button" onClick={() => { setSearchInput(''); setSearch(''); setPage(1); }}
+                  className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50">
+                  Clear
+                </button>
+              )}
+            </form>
           </div>
-          <form onSubmit={handleSearch} className="flex items-center gap-2">
-            <span className="text-sm text-slate-600">Search vendor:</span>
+
+          {/* Row 2: date filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Period:</span>
+            {(['week', 'month', 'year'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => handlePeriod(p)}
+                className={`rounded px-3 py-1 text-xs font-semibold border transition-colors ${
+                  period === p
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-emerald-50'
+                }`}
+              >
+                This {p.charAt(0).toUpperCase() + p.slice(1)}
+              </button>
+            ))}
+            <span className="text-slate-300 mx-1">|</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Custom:</span>
             <input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="w-[200px] rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700"
-              placeholder="Vendor name..."
+              type="date"
+              value={dateFrom}
+              onChange={(e) => { setDateFrom(e.target.value); handleDateRange(); }}
+              className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700"
             />
-            <button type="submit"
-              className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-              Search
-            </button>
-            {search && (
-              <button type="button" onClick={() => { setSearchInput(''); setSearch(''); setPage(1); }}
-                className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50">
-                Clear
+            <span className="text-xs text-slate-400">to</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => { setDateTo(e.target.value); handleDateRange(); }}
+              className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700"
+            />
+            {(period || dateFrom || dateTo) && (
+              <button
+                onClick={() => { setPeriod(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+                className="rounded px-2.5 py-1 text-xs font-semibold border border-slate-300 bg-white text-slate-500 hover:bg-slate-50"
+              >
+                Clear dates
               </button>
             )}
-          </form>
+          </div>
         </div>
 
         {/* Table */}

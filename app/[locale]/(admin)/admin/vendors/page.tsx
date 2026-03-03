@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma';
 import { Link } from '@/i18n/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getServerPlans } from '@/lib/plans';
+import { computePlanDisabledPerms } from '@/lib/access';
 import { VendorActionsWrapper } from './actions-wrapper';
 import { CreateVendorButton } from './create-vendor-button';
 
@@ -88,11 +89,13 @@ export default async function AdminVendorsPage({
     getServerPlans(),
   ]);
 
-  const vendors = vendorsRaw.map((v) => ({
-    ...v,
-    planId: v.subscriptions[0]?.planId ?? null,
-    planTitle: v.subscriptions[0]?.planId ? (plans[v.subscriptions[0].planId]?.title ?? v.subscriptions[0].planId) : 'Free',
-  }));
+  const vendors = vendorsRaw.map((v) => {
+    const planId = v.subscriptions[0]?.planId ?? null;
+    const planTitle = planId ? (plans[planId]?.title ?? planId) : 'Free';
+    const plan = planId ? plans[planId] : plans['free'];
+    const planDisabledPerms = plan ? computePlanDisabledPerms(plan.features) : [];
+    return { ...v, planId, planTitle, planDisabledPerms };
+  });
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const currentPage = Math.min(page, totalPages);
@@ -240,6 +243,7 @@ export default async function AdminVendorsPage({
                       adminUserStatus={adminUserStatus}
                       subscriptionPlanId={vendor.planId}
                       subscriptionPlanTitle={vendor.planTitle}
+                      planDisabledPerms={vendor.planDisabledPerms}
                       vendorStats={{
                         totalUsers: vendor._count.users,
                         totalEmployees: vendor._count.vendorUsers,

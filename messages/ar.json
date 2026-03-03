@@ -44,6 +44,12 @@
     "invalidCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
     "accountInactive": "حسابك غير نشط. يرجى التواصل مع الدعم."
   },
+  "impersonation": {
+    "viewingAsVendor": "أنت تشاهد حالياً كحساب بائع (وضع الانتحال).",
+    "viewingAsEmployee": "أنت تشاهد حالياً كحساب موظف.",
+    "returnToAdmin": "العودة إلى لوحة المسؤول",
+    "returnToMyAccount": "العودة إلى حسابي"
+  },
   "dashboard": {
     "title": "لوحة التحكم",
     "welcome": "مرحباً بك مجدداً",
@@ -57,7 +63,21 @@
     "delivered": "مُسلَّمة",
     "read": "مقروءة",
     "failed": "فشلت",
-    "noMessagesYet": "لا توجد رسائل بعد."
+    "noMessagesYet": "لا توجد رسائل بعد.",
+    "totalVendors": "إجمالي البائعين",
+    "activeSubscriptions": "الاشتراكات النشطة",
+    "platformMessageDelivery": "تسليم رسائل المنصة",
+    "acrossAllWorkspaces": "في جميع مساحات العمل",
+    "latestAcrossWorkspaces": "الأحدث في جميع مساحات العمل",
+    "viewAll": "عرض الكل",
+    "managePlan": "إدارة الخطة",
+    "planUsage": "استخدام الخطة",
+    "renews": "يتجدد",
+    "expired": "منتهية الصلاحية",
+    "limitReached": "تم الوصول للحد",
+    "vendorsAwaitingApproval": "{count} بائع في انتظار الموافقة",
+    "vendorsAwaitingApprovalPlural": "{count} بائعون في انتظار الموافقة",
+    "clickToReviewAndApprove": "انقر للمراجعة والموافقة"
   },
   "contacts": {
     "title": "جهات الاتصال",
@@ -191,6 +211,7 @@
     "anyMessage": "أي رسالة",
     "triggerValue": "قيمة المحفّز",
     "triggerValuePlaceholder": "الأسعار",
+    "step": "خطوة",
     "up": "أعلى",
     "down": "أسفل",
     "remove": "حذف",
@@ -259,7 +280,10 @@
     "manageBotReplies": "إدارة ردود الروبوت",
     "manageChat": "إدارة الدردشة",
     "viewMessageLog": "عرض سجل الرسائل",
-    "manageUsers": "إدارة المستخدمين"
+    "manageUsers": "إدارة المستخدمين",
+    "loginAsEmployee": "الدخول كموظف",
+    "loginAsEmployeeConfirm": "الدخول كهذا الموظف؟ يمكنك العودة لحسابك عبر الشريط في الأعلى.",
+    "loginAsEmployeeSuccess": "تم الدخول كموظف. جاري إعادة التوجيه..."
   },
   "subscription": {
     "title": "الاشتراك",

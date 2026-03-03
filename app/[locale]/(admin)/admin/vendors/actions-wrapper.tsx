@@ -14,6 +14,7 @@ type Props = {
   adminUserStatus: number | null;
   subscriptionPlanId?: string | null;
   subscriptionPlanTitle?: string;
+  planDisabledPerms?: string[];
   vendorStats?: {
     totalUsers: number;
     totalEmployees: number;
@@ -26,6 +27,7 @@ export function VendorActionsWrapper({
   adminUserStatus,
   subscriptionPlanId,
   subscriptionPlanTitle,
+  planDisabledPerms = [],
   vendorStats,
 }: Props) {
   const router = useRouter();
@@ -35,6 +37,7 @@ export function VendorActionsWrapper({
       adminUserStatus={adminUserStatus}
       subscriptionPlanId={subscriptionPlanId}
       subscriptionPlanTitle={subscriptionPlanTitle}
+      planDisabledPerms={planDisabledPerms}
       vendorStats={vendorStats}
       onRefresh={() => router.refresh()}
     />
