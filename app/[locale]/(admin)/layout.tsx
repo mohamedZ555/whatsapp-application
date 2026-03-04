@@ -16,7 +16,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const isRtl = locale === 'ar';
 
   return (
-    <div className={`flex h-screen bg-gradient-to-b from-emerald-50 via-white to-emerald-50/70 text-slate-700 ${isRtl ? 'flex-row-reverse' : ''}`}>
+    <div className={`flex h-screen bg-gradient-to-b from-emerald-50 via-white to-emerald-50/70 text-slate-700 ${isRtl ? '' : ''}`}>
       <AdminSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-16 items-center justify-between border-b border-emerald-100 bg-white/90 px-6 backdrop-blur">

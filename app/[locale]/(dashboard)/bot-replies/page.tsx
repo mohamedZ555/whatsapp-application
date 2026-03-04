@@ -38,20 +38,18 @@ function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
 
-const TRIGGER_LABELS: Record<string, string> = {
-  welcome: "Welcome message",
-  is: "Message is exactly",
-  starts_with: "Message starts with",
-  ends_with: "Message ends with",
-  contains_word: "Message contains word",
-  contains: "Message contains",
-  stop_promotional: "Stop promotional",
-  start_promotional: "Start promotional",
-  start_ai_bot: "Start AI bot",
-  stop_ai_bot: "Stop AI bot",
-};
-
-const TRIGGER_TYPES = Object.keys(TRIGGER_LABELS);
+const TRIGGER_TYPES = [
+  "welcome",
+  "is",
+  "starts_with",
+  "ends_with",
+  "contains_word",
+  "contains",
+  "stop_promotional",
+  "start_promotional",
+  "start_ai_bot",
+  "stop_ai_bot",
+];
 
 const DEFAULT_FORM: ReplyForm = {
   replyName: "",
@@ -68,8 +66,20 @@ const DEFAULT_FORM: ReplyForm = {
 export default function BotRepliesPage() {
   const t = useTranslations("bot");
   const tc = useTranslations("common");
-  const isArabic = t("title") === "ردود الروبوت";
-  const tr = (en: string, ar: string) => (isArabic ? ar : en);
+
+  // Map trigger type keys to translation keys
+  const TRIGGER_LABELS: Record<string, string> = {
+    welcome: t("welcome"),
+    is: t("exactMatch"),
+    starts_with: t("startsWith"),
+    ends_with: t("endsWith"),
+    contains_word: t("containsWord"),
+    contains: t("contains"),
+    stop_promotional: t("stopPromotional"),
+    start_promotional: t("startPromotional"),
+    start_ai_bot: t("startAiBot"),
+    stop_ai_bot: t("stopAiBot"),
+  };
 
   const [tab, setTab] = useState<"replies" | "flows">("replies");
 
@@ -325,6 +335,15 @@ export default function BotRepliesPage() {
     );
   }
 
+  // ── Trigger keyword placeholder ──────────────────────────────────────────
+
+  function getTriggerKeywordPlaceholder() {
+    if (form.triggerType === "is") return t("triggerKeywordExact");
+    if (form.triggerType === "starts_with")
+      return t("triggerKeywordStartsWith");
+    return t("triggerKeywordGeneric");
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -354,8 +373,7 @@ export default function BotRepliesPage() {
           {/* Toolbar */}
           <div className="mb-5 flex items-center justify-between">
             <p className="text-sm text-gray-500">
-              {replies.length} repl{replies.length !== 1 ? "ies" : "y"}{" "}
-              configured
+              {t("repliesConfigured", { count: replies.length })}
             </p>
             <button
               onClick={openCreateForm}
@@ -374,7 +392,9 @@ export default function BotRepliesPage() {
                 className={`px-6 py-4 flex items-center justify-between ${editingReply ? "bg-blue-600" : "bg-emerald-600"}`}
               >
                 <h2 className="font-semibold text-white text-base">
-                  {editingReply ? "✏️ Edit Bot Reply" : "➕ Create Bot Reply"}
+                  {editingReply
+                    ? `✏️ ${t("editBotReply")}`
+                    : `➕ ${t("createBotReply")}`}
                 </h2>
                 <button
                   type="button"
@@ -390,7 +410,8 @@ export default function BotRepliesPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                      Reply Name <span className="text-red-500">*</span>
+                      {t("replyNameLabel")}{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <input
                       value={form.replyName}
@@ -404,7 +425,8 @@ export default function BotRepliesPage() {
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                      Trigger Type <span className="text-red-500">*</span>
+                      {t("triggerTypeLabel")}{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={form.triggerType}
@@ -432,7 +454,7 @@ export default function BotRepliesPage() {
                   ].includes(form.triggerType) && (
                     <div>
                       <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                        Trigger Keyword
+                        {t("triggerKeywordLabel")}
                       </label>
                       <input
                         value={form.triggerSubject}
@@ -440,13 +462,7 @@ export default function BotRepliesPage() {
                           setForm({ ...form, triggerSubject: e.target.value })
                         }
                         className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                        placeholder={
-                          form.triggerType === "is"
-                            ? "Exact text to match…"
-                            : form.triggerType === "starts_with"
-                              ? "Text user message should start with…"
-                              : "Enter keyword…"
-                        }
+                        placeholder={getTriggerKeywordPlaceholder()}
                       />
                     </div>
                   )}
@@ -454,7 +470,7 @@ export default function BotRepliesPage() {
                 {/* Reply type */}
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                    Reply Type
+                    {t("replyTypeLabel")}
                   </label>
                   <div className="flex gap-2">
                     {(["text", "buttons", "list"] as const).map((rt) => (
@@ -471,10 +487,10 @@ export default function BotRepliesPage() {
                         }`}
                       >
                         {rt === "text"
-                          ? "📝 Text"
+                          ? `📝 ${t("textReply")}`
                           : rt === "buttons"
-                            ? "🔘 Buttons"
-                            : "📋 List"}
+                            ? `🔘 ${t("buttonsReply")}`
+                            : `📋 ${t("listReply")}`}
                       </button>
                     ))}
                   </div>
@@ -483,10 +499,10 @@ export default function BotRepliesPage() {
                 {/* Reply message */}
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                    Reply Message
+                    {t("replyMessageLabel")}
                     {form.replyType !== "text" && (
                       <span className="ml-1 font-normal text-gray-400 text-xs">
-                        (header text above options)
+                        {t("headerTextHint")}
                       </span>
                     )}
                   </label>
@@ -497,7 +513,7 @@ export default function BotRepliesPage() {
                     }
                     rows={3}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 resize-none"
-                    placeholder="Type your reply message here…"
+                    placeholder={t("replyMessagePlaceholder")}
                   />
                 </div>
 
@@ -508,11 +524,11 @@ export default function BotRepliesPage() {
                     <div className="mb-2 flex items-center justify-between">
                       <label className="text-sm font-semibold text-gray-700">
                         {form.replyType === "buttons"
-                          ? "🔘 Buttons"
-                          : "📋 List Rows"}
+                          ? `🔘 ${t("buttonsLabel")}`
+                          : `📋 ${t("listRowsLabel")}`}
                         <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-500">
                           {form.options.length}
-                          {form.replyType === "buttons" ? "/3 max" : ""}
+                          {form.replyType === "buttons" ? t("maxButtons") : ""}
                         </span>
                       </label>
                       {(form.replyType !== "buttons" ||
@@ -522,22 +538,25 @@ export default function BotRepliesPage() {
                           onClick={addOption}
                           className="flex items-center gap-1 rounded-lg border border-dashed border-emerald-400 px-3 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 transition-colors"
                         >
-                          + Add{" "}
-                          {form.replyType === "buttons" ? "Button" : "Row"}
+                          +{" "}
+                          {form.replyType === "buttons"
+                            ? t("addButton")
+                            : t("addRow")}
                         </button>
                       )}
                     </div>
 
                     {form.options.length === 0 && (
                       <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 py-6 text-center text-sm text-gray-400">
-                        No {form.replyType === "buttons" ? "buttons" : "rows"}{" "}
-                        yet.{" "}
+                        {form.replyType === "buttons"
+                          ? t("noButtonsYet")
+                          : t("noRowsYet")}{" "}
                         <button
                           type="button"
                           onClick={addOption}
                           className="text-emerald-600 hover:underline"
                         >
-                          Add one
+                          {t("addOne")}
                         </button>
                       </div>
                     )}
@@ -561,8 +580,8 @@ export default function BotRepliesPage() {
                             }
                             placeholder={
                               form.replyType === "buttons"
-                                ? "Button label…"
-                                : "Row title…"
+                                ? t("buttonLabelPlaceholder")
+                                : t("rowTitlePlaceholder")
                             }
                             maxLength={form.replyType === "buttons" ? 20 : 24}
                             className="flex-1 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-100"
@@ -580,7 +599,7 @@ export default function BotRepliesPage() {
                             type="button"
                             onClick={() => removeOption(opt.id)}
                             className="flex-shrink-0 rounded-md p-1 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                            title="Remove"
+                            title={tc("delete")}
                           >
                             <svg
                               width="14"
@@ -604,7 +623,7 @@ export default function BotRepliesPage() {
                     {form.replyType === "list" && (
                       <div className="mt-3">
                         <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                          List Button Label
+                          {t("listButtonLabel")}
                         </label>
                         <input
                           value={form.buttonText}
@@ -612,7 +631,7 @@ export default function BotRepliesPage() {
                             setForm({ ...form, buttonText: e.target.value })
                           }
                           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                          placeholder="View Options"
+                          placeholder={t("listButtonPlaceholder")}
                           maxLength={20}
                         />
                       </div>
@@ -633,7 +652,9 @@ export default function BotRepliesPage() {
                       </>
                     ) : (
                       <>
-                        {editingReply ? "✅ Update Reply" : "✅ Create Reply"}
+                        {editingReply
+                          ? `✅ ${t("updateReply")}`
+                          : `✅ ${t("createReply")}`}
                       </>
                     )}
                   </button>
@@ -652,23 +673,24 @@ export default function BotRepliesPage() {
           {/* ── Reply List ── */}
           {loadingReplies && (
             <div className="flex items-center justify-center py-16 text-gray-400">
-              <span className="animate-spin mr-2 text-xl">⟳</span> Loading…
+              <span className="animate-spin mr-2 text-xl">⟳</span>{" "}
+              {t("loading")}
             </div>
           )}
           {!loadingReplies && replies.length === 0 && (
             <div className="rounded-2xl border border-gray-100 bg-white py-16 text-center shadow-sm">
               <p className="mb-2 text-4xl">🤖</p>
               <p className="font-semibold text-gray-600">
-                {tr("No quick replies yet", "لا توجد ردود سريعة بعد")}
+                {t("noQuickRepliesYet")}
               </p>
               <p className="mt-1 text-sm text-gray-400">
-                Create your first bot reply to automate responses
+                {t("noQuickRepliesDesc")}
               </p>
               <button
                 onClick={openCreateForm}
                 className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
               >
-                Create First Reply
+                {t("createFirstReply")}
               </button>
             </div>
           )}
@@ -707,7 +729,7 @@ export default function BotRepliesPage() {
                           </span>
                           {r.triggerSubject && (
                             <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 border border-gray-200">
-                              "{r.triggerSubject}"
+                              &quot;{r.triggerSubject}&quot;
                             </span>
                           )}
                           <span
@@ -719,7 +741,11 @@ export default function BotRepliesPage() {
                                   : "bg-green-50 text-green-700 border-green-100"
                             }`}
                           >
-                            {r.replyType}
+                            {r.replyType === "buttons"
+                              ? t("buttonsReply")
+                              : r.replyType === "list"
+                                ? t("listReply")
+                                : t("textReply")}
                           </span>
                         </div>
                       </div>
@@ -735,13 +761,15 @@ export default function BotRepliesPage() {
                             : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                         }`}
                       >
-                        {r.status === 1 ? "● Active" : "○ Inactive"}
+                        {r.status === 1
+                          ? `● ${t("statusActive")}`
+                          : `○ ${t("statusInactive")}`}
                       </button>
                       <button
                         onClick={() => openEditForm(r)}
                         className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
                       >
-                        Edit
+                        {tc("edit")}
                       </button>
                       <button
                         onClick={() => handleDeleteReply(r.id)}
@@ -779,7 +807,7 @@ export default function BotRepliesPage() {
                   {r.replyType === "list" && rows.length > 0 && (
                     <div className="px-5 pb-4">
                       <p className="mb-1.5 text-xs font-medium text-gray-400 uppercase tracking-wide">
-                        Rows
+                        {t("listRowsLabel")}
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {rows.map((row: any) => (
@@ -806,8 +834,8 @@ export default function BotRepliesPage() {
           {/* Toolbar */}
           <div className="mb-5 flex items-center justify-between">
             <p className="text-sm text-gray-500">
-              {flows.length} flow{flows.length !== 1 ? "s" : ""} ·{" "}
-              {categories.length} categor{categories.length !== 1 ? "ies" : "y"}
+              {flows.length} {t("botFlows").toLowerCase()} · {categories.length}{" "}
+              {t("jobCategoriesTitle").toLowerCase()}
             </p>
             <button
               onClick={() => setShowCreateFlow(true)}
@@ -854,7 +882,8 @@ export default function BotRepliesPage() {
           {/* Loading */}
           {loadingFlows && (
             <div className="flex items-center justify-center py-16 text-gray-400">
-              <span className="animate-spin mr-2 text-xl">⟳</span> Loading…
+              <span className="animate-spin mr-2 text-xl">⟳</span>{" "}
+              {t("loading")}
             </div>
           )}
 
@@ -862,15 +891,13 @@ export default function BotRepliesPage() {
           {!loadingFlows && flows.length === 0 && (
             <div className="rounded-2xl border border-gray-100 bg-white py-16 text-center shadow-sm">
               <p className="mb-2 text-4xl">🤖</p>
-              <p className="font-semibold text-gray-600">No bot flows yet</p>
-              <p className="mt-1 text-sm text-gray-400">
-                Create a flow to build visual chatbot conversations
-              </p>
+              <p className="font-semibold text-gray-600">{t("noFlowsYet")}</p>
+              <p className="mt-1 text-sm text-gray-400">{t("noFlowsDesc")}</p>
               <button
                 onClick={() => setShowCreateFlow(true)}
                 className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
               >
-                Create First Flow
+                {t("createFirstFlow")}
               </button>
             </div>
           )}
@@ -907,32 +934,40 @@ export default function BotRepliesPage() {
                           : "bg-black/20 text-white/70"
                       }`}
                     >
-                      {flow.status === 1 ? "● Active" : "○ Paused"}
+                      {flow.status === 1
+                        ? `● ${t("statusActive")}`
+                        : `○ ${t("statusInactive")}`}
                     </span>
                   </div>
 
                   {/* Card body */}
                   <div className="px-4 py-3 flex-1 space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-gray-400">Trigger:</span>
+                      <span className="text-xs text-gray-400">
+                        {t("triggerLabel")}
+                      </span>
                       <span className="rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
                         {triggerType}
                       </span>
                       {triggerValue && (
                         <span className="text-xs text-gray-500 truncate max-w-[100px]">
-                          "{triggerValue}"
+                          &quot;{triggerValue}&quot;
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400">Nodes:</span>
+                      <span className="text-xs text-gray-400">
+                        {t("nodesLabel")}
+                      </span>
                       <span className="text-xs font-semibold text-gray-700">
                         {nodeCount}
                       </span>
                     </div>
                     {assignedCategory && (
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400">Category:</span>
+                        <span className="text-xs text-gray-400">
+                          {t("categoryLabel")}
+                        </span>
                         <span
                           className="rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
                           style={{ background: assignedCategory.color }}
@@ -959,7 +994,7 @@ export default function BotRepliesPage() {
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       }`}
                     >
-                      {flow.status === 1 ? "Pause" : "Activate"}
+                      {flow.status === 1 ? t("pause") : t("activate")}
                     </button>
                     <div className="flex-1" />
                     <button
@@ -978,7 +1013,7 @@ export default function BotRepliesPage() {
           {categories.length > 0 && (
             <div className="mt-8 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
               <h3 className="mb-3 text-sm font-semibold text-gray-700">
-                📂 Job Categories for Chat Routing
+                📂 {t("jobCategoriesTitle")}
               </h3>
               <div className="flex flex-wrap gap-2">
                 {categories.map((cat) => (
@@ -997,9 +1032,7 @@ export default function BotRepliesPage() {
                 ))}
               </div>
               <p className="mt-3 text-xs text-gray-400">
-                In the flow builder, assign a category to a button or list row.
-                When a user taps that option, the chat is automatically routed
-                to an available employee in that category.
+                {t("jobCategoriesHint")}
               </p>
             </div>
           )}

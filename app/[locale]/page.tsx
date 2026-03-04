@@ -197,7 +197,7 @@ export default async function LandingPage() {
       <PricingSection plans={plans} />
 
       {/* ── TESTIMONIALS ─────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-6 py-20">
+      {/* <section className="mx-auto max-w-7xl px-6 py-20">
         <div className="mb-12 text-center">
           <h2 className="text-3xl font-bold text-gray-900">{t('testimonials.title')}</h2>
           <p className="mt-2 text-gray-500">{t('testimonials.subtitle')}</p>
@@ -225,7 +225,7 @@ export default async function LandingPage() {
             </div>
           ))}
         </div>
-      </section>
+      </section> */}
 
       {/* ── FAQ ─────────────────────────────────────────────────────── */}
       <section className="bg-gray-50 px-6 py-20">

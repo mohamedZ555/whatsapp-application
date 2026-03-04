@@ -1,21 +1,41 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 const COMMON_CONFIG_KEYS = [
-  'app_name',
-  'allow_registration',
-  'smtp_host',
-  'smtp_port',
-  'smtp_user',
-  'smtp_pass',
-  'currency',
+  "app_name",
+  "allow_registration",
+  "smtp_host",
+  "smtp_port",
+  "smtp_user",
+  "smtp_pass",
+  "currency",
 ];
 
 export default function AdminConfigurationGeneralPage() {
-  const tAdmin = useTranslations('admin');
-  const tCommon = useTranslations('common');
+  const tAdmin = useTranslations("admin");
+  const tCommon = useTranslations("common");
+
+  const CONFIG_KEY_LABELS: Record<string, string> = {
+    app_name: tAdmin("appName"),
+    app_logo: tAdmin("appLogo"),
+    favicon: tAdmin("favicon"),
+    allow_registration: tAdmin("allowRegistration"),
+    require_activation: tAdmin("requireActivation"),
+    currency: tAdmin("currency"),
+    smtp_host: "SMTP Host",
+    smtp_port: "SMTP Port",
+    smtp_user: "SMTP User",
+    smtp_pass: "SMTP Password",
+  };
+
+  function configKeyLabel(key: string): string {
+    return (
+      CONFIG_KEY_LABELS[key] ??
+      key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    );
+  }
 
   const [configs, setConfigs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -23,21 +43,23 @@ export default function AdminConfigurationGeneralPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetch('/api/admin/config')
+    fetch("/api/admin/config")
       .then((r) => r.json())
-      .then((data: Array<{ configKey: string; configValue: string | null }>) => {
-        const map: Record<string, string> = {};
-        // Seed with empty defaults for common keys
-        for (const key of COMMON_CONFIG_KEYS) {
-          map[key] = '';
-        }
-        if (Array.isArray(data)) {
-          for (const cfg of data) {
-            map[cfg.configKey] = cfg.configValue ?? '';
+      .then(
+        (data: Array<{ configKey: string; configValue: string | null }>) => {
+          const map: Record<string, string> = {};
+          // Seed with empty defaults for common keys
+          for (const key of COMMON_CONFIG_KEYS) {
+            map[key] = "";
           }
-        }
-        setConfigs(map);
-      })
+          if (Array.isArray(data)) {
+            for (const cfg of data) {
+              map[cfg.configKey] = cfg.configValue ?? "";
+            }
+          }
+          setConfigs(map);
+        },
+      )
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -51,9 +73,9 @@ export default function AdminConfigurationGeneralPage() {
         configKey,
         configValue,
       }));
-      const res = await fetch('/api/admin/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/admin/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ configs: pairs }),
       });
       const data = await res.json();
@@ -73,32 +95,39 @@ export default function AdminConfigurationGeneralPage() {
   }
 
   const allKeys = Array.from(
-    new Set([...COMMON_CONFIG_KEYS, ...Object.keys(configs)])
+    new Set([...COMMON_CONFIG_KEYS, ...Object.keys(configs)]),
   );
 
   return (
     <div className="space-y-5">
-      <h1 className="text-3xl font-bold text-emerald-950">{tAdmin('generalConfiguration')}</h1>
+      <h1 className="text-3xl font-bold text-emerald-950">
+        {tAdmin("generalConfiguration")}
+      </h1>
 
       {saved && (
         <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">
-          {tCommon('savedSuccessfully')}
+          {tCommon("savedSuccessfully")}
         </div>
       )}
 
       {loading ? (
-        <div className="py-10 text-center text-gray-400">{tCommon('loading')}</div>
+        <div className="py-10 text-center text-gray-400">
+          {tCommon("loading")}
+        </div>
       ) : (
         <form onSubmit={handleSave}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {allKeys.map((key) => (
-              <div key={key} className="bg-white rounded-xl border border-emerald-100 p-4 shadow-sm">
+              <div
+                key={key}
+                className="bg-white rounded-xl border border-emerald-100 p-4 shadow-sm"
+              >
                 <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">
-                  {key}
+                  {configKeyLabel(key)}
                 </label>
                 <input
-                  type={key === 'smtp_pass' ? 'password' : 'text'}
-                  value={configs[key] ?? ''}
+                  type={key === "smtp_pass" ? "password" : "text"}
+                  value={configs[key] ?? ""}
                   onChange={(e) => handleChange(key, e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                 />
@@ -111,7 +140,7 @@ export default function AdminConfigurationGeneralPage() {
               disabled={saving}
               className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
-              {saving ? tCommon('saving') : tCommon('save')}
+              {saving ? tCommon("saving") : tCommon("save")}
             </button>
           </div>
         </form>

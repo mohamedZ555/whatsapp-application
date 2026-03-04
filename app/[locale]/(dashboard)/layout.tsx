@@ -51,7 +51,7 @@ export default async function DashboardLayout({
 
   return (
     <div
-      className={`flex h-screen bg-gradient-to-b from-emerald-50 via-white to-emerald-50/70 ${isRtl ? "flex-row-reverse" : ""}`}
+      className={`flex h-screen bg-gradient-to-b from-emerald-50 via-white to-emerald-50/70 ${isRtl ? "" : ""}`}
     >
       <Sidebar
         roleId={roleId}

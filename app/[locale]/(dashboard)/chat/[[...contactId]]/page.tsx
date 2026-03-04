@@ -21,13 +21,17 @@ function formatTime(date: string | Date) {
     minute: "2-digit",
   });
 }
-function formatDate(date: string | Date) {
+function formatDate(
+  date: string | Date,
+  todayLabel: string,
+  yesterdayLabel: string,
+) {
   const d = new Date(date);
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return "Today";
-  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  if (d.toDateString() === today.toDateString()) return todayLabel;
+  if (d.toDateString() === yesterday.toDateString()) return yesterdayLabel;
   return d.toLocaleDateString([], {
     weekday: "long",
     month: "short",
@@ -67,6 +71,8 @@ function TemplateModal({
   onClose: () => void;
   onSent: (msg: any) => void;
 }) {
+  const t = useTranslations("chat");
+  const tc = useTranslations("common");
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
@@ -128,7 +134,7 @@ function TemplateModal({
       });
       onClose();
     } else {
-      setError(data.error ?? "Failed to send template.");
+      setError(data.error ?? t("noTemplates"));
     }
   }
 
@@ -141,7 +147,7 @@ function TemplateModal({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-emerald-600 to-teal-600">
           <h3 className="text-white font-semibold text-base">
-            📋 Send Template Message
+            {t("templateTitle")}
           </h3>
           <button
             onClick={onClose}
@@ -153,15 +159,13 @@ function TemplateModal({
         <div className="p-5 max-h-[70vh] overflow-y-auto space-y-3">
           {loading ? (
             <div className="py-8 text-center text-slate-400 text-sm">
-              Loading templates…
+              {t("loadingTemplates")}
             </div>
           ) : templates.length === 0 ? (
             <div className="py-8 text-center text-slate-400 text-sm">
               <p className="text-3xl mb-2">📭</p>
-              <p>No approved templates found.</p>
-              <p className="text-xs mt-1">
-                Go to Templates page to create and approve templates first.
-              </p>
+              <p>{t("noTemplates")}</p>
+              <p className="text-xs mt-1">{t("noTemplatesHint")}</p>
             </div>
           ) : (
             templates.map((t) => {
@@ -250,14 +254,14 @@ function TemplateModal({
             onClick={onClose}
             className="px-4 py-2 rounded-lg border border-slate-300 text-sm text-slate-600 hover:bg-slate-50"
           >
-            Cancel
+            {tc("cancel")}
           </button>
           <button
             disabled={!selected || sending}
             onClick={handleSend}
             className="px-5 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
           >
-            {sending ? "Sending…" : "Send Template"}
+            {sending ? t("sending") : t("sendTemplateBtn")}
           </button>
         </div>
       </div>
@@ -268,6 +272,7 @@ function TemplateModal({
 
 /* ─── Media Preview ── */
 function MediaPreview({ msg }: { msg: any }) {
+  const t = useTranslations("chat");
   const mediaData = (msg.data as any) ?? {};
   const type = msg.messageType as string;
   const url = mediaData.mediaUrl ?? mediaData.media_values?.url ?? null;
@@ -293,7 +298,7 @@ function MediaPreview({ msg }: { msg: any }) {
     return (
       <div className="flex items-center gap-2 opacity-80">
         <span>🖼️</span>
-        <span className="text-xs">{caption || fileName || "Image sent"}</span>
+        <span className="text-xs">{caption || fileName || t("imageSent")}</span>
       </div>
     );
   }
@@ -314,7 +319,7 @@ function MediaPreview({ msg }: { msg: any }) {
     return (
       <div className="flex items-center gap-2 opacity-80">
         <span>🎬</span>
-        <span className="text-xs">{caption || fileName || "Video sent"}</span>
+        <span className="text-xs">{caption || fileName || t("videoSent")}</span>
       </div>
     );
   }
@@ -341,12 +346,12 @@ function MediaPreview({ msg }: { msg: any }) {
           <p
             className={`text-xs font-medium ${isOut ? "text-white" : "text-slate-700"}`}
           >
-            {fileName || "Voice message"}
+            {fileName || t("voiceMessage")}
           </p>
           <p
             className={`text-[10px] ${isOut ? "text-white/60" : "text-slate-400"}`}
           >
-            Audio
+            {t("audio")}
           </p>
         </div>
       </div>
@@ -434,8 +439,6 @@ export default function ChatPage({
   const t = useTranslations("chat");
   const tc = useTranslations("common");
   const locale = useLocale();
-  const isArabic = locale === "ar";
-  const tr = (en: string, ar: string) => (isArabic ? ar : en);
   const router = useRouter();
   const { data: session } = useSession();
   const roleId = (session?.user as any)?.roleId as number | undefined;
@@ -762,23 +765,29 @@ export default function ChatPage({
   const contactName = (c: any) =>
     [c.firstName, c.lastName].filter(Boolean).join(" ") || c.waId;
 
+  const todayLabel = t("today");
+  const yesterdayLabel = t("yesterday");
+
   /* ── Group messages by date ── */
   const messagesWithDates = messages.reduce<
     Array<{ type: "date" | "msg"; date?: string; msg?: any }>
   >((acc, msg, i) => {
     const prev = messages[i - 1];
     if (!prev || !isSameDay(prev.createdAt, msg.createdAt)) {
-      acc.push({ type: "date", date: formatDate(msg.createdAt) });
+      acc.push({
+        type: "date",
+        date: formatDate(msg.createdAt, todayLabel, yesterdayLabel),
+      });
     }
     acc.push({ type: "msg", msg });
     return acc;
   }, []);
 
   const filterLabels: { key: ChatFilter; label: string }[] = [
-    { key: "all", label: tr("All", "الكل") },
-    { key: "unread", label: tr("Unread", "غير المقروء") },
-    { key: "mine", label: tr("Mine", "الخاص بي") },
-    { key: "unassigned", label: tr("Unassigned", "غير المسند") },
+    { key: "all", label: t("filterAll") },
+    { key: "unread", label: t("filterUnread") },
+    { key: "mine", label: t("filterMine") },
+    { key: "unassigned", label: t("filterUnassigned") },
   ];
 
   return (
@@ -1009,7 +1018,7 @@ export default function ChatPage({
                               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                             >
                               <span>🗑️</span>
-                              <span>Clear Chat History</span>
+                              <span>{t("clearChat")}</span>
                             </button>
                           </>
                         )}
@@ -1184,17 +1193,21 @@ export default function ChatPage({
             )}
 
             {/* ── Input Bar ── */}
-            <form onSubmit={handleSend} className="bg-white border-t border-slate-100 px-3 py-2.5">
+            <form
+              onSubmit={handleSend}
+              className="bg-white border-t border-slate-100 px-3 py-2.5"
+            >
               <div className="flex items-center gap-2">
-
                 {/* ── Pill input wrapper ── */}
                 <div className="flex-1 flex items-center gap-1.5 bg-slate-100 rounded-full px-3 py-1.5 border border-slate-200 focus-within:border-emerald-400 focus-within:bg-white transition-all min-w-0">
-
                   {/* Emoji picker trigger */}
                   <div className="relative flex-shrink-0" ref={emojiRef}>
                     <button
                       type="button"
-                      onClick={() => { setShowEmojiPicker(p => !p); setShowAttachMenu(false); }}
+                      onClick={() => {
+                        setShowEmojiPicker((p) => !p);
+                        setShowAttachMenu(false);
+                      }}
                       className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-yellow-500 transition-colors rounded-full hover:bg-slate-200 text-lg leading-none"
                       title="Emoji"
                     >
@@ -1207,7 +1220,7 @@ export default function ChatPage({
                         <Picker
                           data={emojiData}
                           onEmojiSelect={(emoji: any) => {
-                            setText(prev => prev + emoji.native);
+                            setText((prev) => prev + emoji.native);
                             textInputRef.current?.focus();
                             setShowEmojiPicker(false);
                           }}
@@ -1229,7 +1242,11 @@ export default function ChatPage({
                     type="text"
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    placeholder={selectedFile ? `✉️ Ready to send ${selectedFileType}…` : t("typeMessage")}
+                    placeholder={
+                      selectedFile
+                        ? t("readyToSend", { type: selectedFileType })
+                        : t("typeMessage")
+                    }
                     disabled={!!selectedFile}
                     className="flex-1 bg-transparent border-none outline-none text-sm text-slate-800 placeholder:text-slate-400 disabled:opacity-60 min-w-0 py-1"
                   />
@@ -1238,14 +1255,27 @@ export default function ChatPage({
                   <div className="relative flex-shrink-0" ref={attachRef}>
                     <button
                       type="button"
-                      onClick={() => { setShowAttachMenu(p => !p); setShowEmojiPicker(false); }}
+                      onClick={() => {
+                        setShowAttachMenu((p) => !p);
+                        setShowEmojiPicker(false);
+                      }}
                       className={cn(
                         "w-7 h-7 flex items-center justify-center transition-colors rounded-full hover:bg-slate-200",
-                        showAttachMenu ? "text-emerald-600 bg-emerald-50" : "text-slate-400 hover:text-emerald-600"
+                        showAttachMenu
+                          ? "text-emerald-600 bg-emerald-50"
+                          : "text-slate-400 hover:text-emerald-600",
                       )}
                       title="Attach file"
                     >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-4 h-4"
+                      >
                         <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                       </svg>
                     </button>
@@ -1253,42 +1283,81 @@ export default function ChatPage({
                     {/* Attach popup — 2×2 grid */}
                     {showAttachMenu && (
                       <div className="absolute bottom-10 right-0 z-30 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 w-52">
-                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2.5">Send attachment</p>
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2.5">
+                          {t("sendAttachment")}
+                        </p>
                         <div className="grid grid-cols-2 gap-2">
-
                           {/* Image */}
                           <label className="flex flex-col items-center gap-2 p-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 cursor-pointer transition-all border border-emerald-100 hover:border-emerald-300">
                             <span className="text-2xl">📷</span>
-                            <span className="text-[11px] font-semibold text-emerald-700">Image</span>
-                            <input ref={imageInputRef} type="file" className="hidden" accept="image/*"
-                              onChange={(e) => { handleFileSelect(e, "image"); setShowAttachMenu(false); }} />
+                            <span className="text-[11px] font-semibold text-emerald-700">
+                              {t("attachImage")}
+                            </span>
+                            <input
+                              ref={imageInputRef}
+                              type="file"
+                              className="hidden"
+                              accept="image/*"
+                              onChange={(e) => {
+                                handleFileSelect(e, "image");
+                                setShowAttachMenu(false);
+                              }}
+                            />
                           </label>
 
                           {/* Video */}
                           <label className="flex flex-col items-center gap-2 p-3 rounded-xl bg-rose-50 hover:bg-rose-100 cursor-pointer transition-all border border-rose-100 hover:border-rose-300">
                             <span className="text-2xl">🎬</span>
-                            <span className="text-[11px] font-semibold text-rose-600">Video</span>
-                            <input ref={videoInputRef} type="file" className="hidden" accept="video/*"
-                              onChange={(e) => { handleFileSelect(e, "video"); setShowAttachMenu(false); }} />
+                            <span className="text-[11px] font-semibold text-rose-600">
+                              {t("attachVideo")}
+                            </span>
+                            <input
+                              ref={videoInputRef}
+                              type="file"
+                              className="hidden"
+                              accept="video/*"
+                              onChange={(e) => {
+                                handleFileSelect(e, "video");
+                                setShowAttachMenu(false);
+                              }}
+                            />
                           </label>
 
                           {/* Audio */}
                           <label className="flex flex-col items-center gap-2 p-3 rounded-xl bg-purple-50 hover:bg-purple-100 cursor-pointer transition-all border border-purple-100 hover:border-purple-300">
                             <span className="text-2xl">🎵</span>
-                            <span className="text-[11px] font-semibold text-purple-600">Audio</span>
-                            <input ref={audioInputRef} type="file" className="hidden" accept="audio/*"
-                              onChange={(e) => { handleFileSelect(e, "audio"); setShowAttachMenu(false); }} />
+                            <span className="text-[11px] font-semibold text-purple-600">
+                              {t("attachAudio")}
+                            </span>
+                            <input
+                              ref={audioInputRef}
+                              type="file"
+                              className="hidden"
+                              accept="audio/*"
+                              onChange={(e) => {
+                                handleFileSelect(e, "audio");
+                                setShowAttachMenu(false);
+                              }}
+                            />
                           </label>
 
                           {/* Document */}
                           <label className="flex flex-col items-center gap-2 p-3 rounded-xl bg-blue-50 hover:bg-blue-100 cursor-pointer transition-all border border-blue-100 hover:border-blue-300">
                             <span className="text-2xl">📄</span>
-                            <span className="text-[11px] font-semibold text-blue-600">Document</span>
-                            <input ref={docInputRef} type="file" className="hidden"
+                            <span className="text-[11px] font-semibold text-blue-600">
+                              {t("attachDocument")}
+                            </span>
+                            <input
+                              ref={docInputRef}
+                              type="file"
+                              className="hidden"
                               accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar"
-                              onChange={(e) => { handleFileSelect(e, "document"); setShowAttachMenu(false); }} />
+                              onChange={(e) => {
+                                handleFileSelect(e, "document");
+                                setShowAttachMenu(false);
+                              }}
+                            />
                           </label>
-
                         </div>
                       </div>
                     )}
@@ -1322,12 +1391,31 @@ export default function ChatPage({
                     title="Send"
                   >
                     {sending || uploading ? (
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      <svg
+                        className="animate-spin h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
                       </svg>
                     ) : (
-                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 translate-x-0.5">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        className="w-5 h-5 translate-x-0.5"
+                      >
                         <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                       </svg>
                     )}
@@ -1339,7 +1427,9 @@ export default function ChatPage({
               {recording && (
                 <div className="flex items-center gap-2 mt-2 px-1">
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
-                  <span className="text-xs text-red-600 font-medium">Recording… tap ⏹ to stop and send</span>
+                  <span className="text-xs text-red-600 font-medium">
+                    {t("recording")}
+                  </span>
                 </div>
               )}
             </form>

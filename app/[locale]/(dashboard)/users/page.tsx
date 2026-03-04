@@ -70,75 +70,92 @@ type RoleFilter = "all" | "admins" | "employees";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PERMISSION_LABELS: Record<string, string> = {
-  manage_contacts: "Contacts",
-  manage_campaigns: "Campaigns",
-  manage_templates: "Templates",
-  manage_bot_replies: "Bot Replies",
-  manage_chat: "Chat",
-  view_message_log: "Message Log",
-  manage_users: "Users",
+// PERMISSION_LABELS is now built inside components using useTranslations
+const PERM_KEY_MAP: Record<string, string> = {
+  manage_contacts: "permContactsLabel",
+  manage_campaigns: "permCampaignsLabel",
+  manage_templates: "permTemplatesLabel",
+  manage_bot_replies: "permBotRepliesLabel",
+  manage_chat: "permChatLabel",
+  view_message_log: "permMessageLogLabel",
+  manage_users: "permUsersLabel",
 };
 
-const STATUS_MAP: Record<number, { label: string; cls: string; dot: string }> =
-  {
+// STATUS_MAP and ROLE_CONFIG labels are now built inside components using useTranslations
+function getStatusMapEntry(
+  status: number,
+  t: (k: string) => string,
+): { label: string; cls: string; dot: string } {
+  const map: Record<number, { label: string; cls: string; dot: string }> = {
     1: {
-      label: "Active",
+      label: t("statusActive"),
       cls: "bg-emerald-100 text-emerald-700",
       dot: "bg-emerald-500",
     },
     2: {
-      label: "Inactive",
+      label: t("statusInactive"),
       cls: "bg-slate-100 text-slate-500",
       dot: "bg-slate-400",
     },
     3: {
-      label: "Suspended",
+      label: t("statusSuspended"),
       cls: "bg-orange-100 text-orange-600",
       dot: "bg-orange-500",
     },
     4: {
-      label: "Pending",
+      label: t("statusPending"),
       cls: "bg-amber-100 text-amber-700",
       dot: "bg-amber-500",
     },
     5: {
-      label: "Deleted",
+      label: t("statusDeleted"),
       cls: "bg-slate-100 text-slate-400",
       dot: "bg-slate-300",
     },
-    6: { label: "Banned", cls: "bg-red-100 text-red-700", dot: "bg-red-500" },
+    6: {
+      label: t("statusBanned"),
+      cls: "bg-red-100 text-red-700",
+      dot: "bg-red-500",
+    },
   };
+  return (
+    map[status] ?? {
+      label: t("statusUnknown"),
+      cls: "bg-slate-100 text-slate-500",
+      dot: "bg-slate-300",
+    }
+  );
+}
 
-const ROLE_CONFIG: Record<
-  number,
-  { label: string; cls: string; icon: string }
-> = {
-  [USER_ROLES.SUPER_ADMIN]: {
-    label: "Super Admin",
-    cls: "bg-purple-100 text-purple-700 border-purple-200",
-    icon: "⚡",
-  },
-  [USER_ROLES.VENDOR]: {
-    label: "Admin",
-    cls: "bg-blue-100 text-blue-700 border-blue-200",
-    icon: "🏢",
-  },
-  [USER_ROLES.VENDOR_USER]: {
-    label: "Employee",
-    cls: "bg-slate-100 text-slate-700 border-slate-200",
-    icon: "👤",
-  },
-};
+function getRoleConfig(
+  roleId: number,
+  t: (k: string) => string,
+): { label: string; cls: string; icon: string } | undefined {
+  const map: Record<number, { label: string; cls: string; icon: string }> = {
+    [USER_ROLES.SUPER_ADMIN]: {
+      label: t("superAdminRole"),
+      cls: "bg-purple-100 text-purple-700 border-purple-200",
+      icon: "⚡",
+    },
+    [USER_ROLES.VENDOR]: {
+      label: t("adminRole"),
+      cls: "bg-blue-100 text-blue-700 border-blue-200",
+      icon: "🏢",
+    },
+    [USER_ROLES.VENDOR_USER]: {
+      label: t("employeeRole"),
+      cls: "bg-slate-100 text-slate-700 border-slate-200",
+      icon: "👤",
+    },
+  };
+  return map[roleId];
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: number }) {
-  const s = STATUS_MAP[status] ?? {
-    label: "Unknown",
-    cls: "bg-slate-100 text-slate-500",
-    dot: "bg-slate-300",
-  };
+  const t = useTranslations("users");
+  const s = getStatusMapEntry(status, t as any);
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${s.cls}`}
@@ -156,6 +173,7 @@ function PermsBadges({
   perms: string[];
   variant?: "default" | "compact";
 }) {
+  const t = useTranslations("users");
   if (!perms.length) return <span className="text-slate-300 text-xs">—</span>;
   const colorCls =
     variant === "compact"
@@ -168,7 +186,7 @@ function PermsBadges({
           key={p}
           className={`inline-flex rounded-md border px-1.5 py-0.5 text-[11px] font-medium ${colorCls}`}
         >
-          {PERMISSION_LABELS[p] ?? p}
+          {t(PERM_KEY_MAP[p] as any) ?? p}
         </span>
       ))}
     </div>
@@ -188,9 +206,12 @@ function PermCheckboxes({
 }: {
   selected: string[];
   onChange: (perms: string[]) => void;
-  allowedPerms?: string[]; // undefined = no restriction from admin scope
-  planDisabledPerms?: string[]; // permissions disabled by subscription plan
+  allowedPerms?: string[];
+  planDisabledPerms?: string[];
 }) {
+  const t = useTranslations("users");
+  const permLabel = (perm: string) => t(PERM_KEY_MAP[perm] as any) ?? perm;
+
   return (
     <div className="space-y-1.5">
       <div className="flex flex-wrap gap-2">
@@ -234,14 +255,11 @@ function PermCheckboxes({
                 {!isPlanLocked && isAdminLocked && (
                   <span className="text-[10px]">🔒</span>
                 )}
-                {PERMISSION_LABELS[perm] ?? perm}
+                {permLabel(perm)}
               </label>
-              {/* Tooltip for locked permissions */}
               {locked && (
                 <div className="pointer-events-none absolute -top-9 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-slate-800 px-2.5 py-1.5 text-[11px] text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 whitespace-nowrap">
-                  {isPlanLocked
-                    ? "Disabled by subscription plan"
-                    : "Admin doesn't have this permission"}
+                  {isPlanLocked ? t("lockedByPlan") : t("lockedByAdmin")}
                   <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
                 </div>
               )}
@@ -250,26 +268,19 @@ function PermCheckboxes({
         })}
       </div>
 
-      {/* Plan-locked warning */}
       {planDisabledPerms.length > 0 && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
           <span className="text-sm">📋</span>
           <div>
-            <p className="font-semibold">
-              Some permissions are locked by the current plan
-            </p>
+            <p className="font-semibold">{t("planLockedWarning")}</p>
             <p className="mt-0.5">
-              Upgrade the subscription plan to unlock{" "}
-              {planDisabledPerms
-                .map((p) => PERMISSION_LABELS[p] ?? p)
-                .join(", ")}
-              .
+              {t("planLockedUpgrade")}{" "}
+              {planDisabledPerms.map((p) => permLabel(p)).join(", ")}.
             </p>
           </div>
         </div>
       )}
 
-      {/* Warning banner if admin has no permissions */}
       {allowedPerms !== undefined &&
         allowedPerms.filter((p) => !planDisabledPerms.includes(p)).length ===
           0 &&
@@ -277,25 +288,19 @@ function PermCheckboxes({
           <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
             <span className="text-sm">⚠️</span>
             <div>
-              <p className="font-semibold">Admin has no permissions</p>
-              <p className="mt-0.5">
-                The admin this employee belongs to has no permissions assigned.
-                All checkboxes are locked. Edit the admin first to grant them
-                permissions.
-              </p>
+              <p className="font-semibold">{t("adminNoPerms")}</p>
+              <p className="mt-0.5">{t("adminNoPermsDesc")}</p>
             </div>
           </div>
         )}
 
-      {/* Info if some are locked by admin scope */}
       {allowedPerms !== undefined &&
         allowedPerms.length > 0 &&
         VENDOR_PERMISSIONS.some(
           (p) => !allowedPerms.includes(p) && !planDisabledPerms.includes(p),
         ) && (
           <p className="text-[11px] text-slate-400">
-            🔒 Locked permissions are not available because the admin (owner)
-            doesn't have them.
+            🔒 {t("lockedByAdminHint")}
           </p>
         )}
     </div>
@@ -385,7 +390,9 @@ function CreateModal({
 }) {
   const t = useTranslations("users");
   const tc = useTranslations("common");
-  const isArabic = t("title") === "أعضاء الفريق";
+  const PERMISSION_LABELS = Object.fromEntries(
+    Object.entries(PERM_KEY_MAP).map(([perm, key]) => [perm, t(key as any)]),
+  );
   const [form, setForm] = useState<UserFormState>({
     firstName: "",
     lastName: "",
@@ -582,7 +589,7 @@ function CreateModal({
                 {t("permissions")}
                 {isAdminRole && (
                   <span className="ml-2 text-xs font-normal text-slate-400">
-                    (admin-level access controls)
+                    {t("adminLevelHint")}
                   </span>
                 )}
               </label>
@@ -638,9 +645,11 @@ function EditModal({
   onClose: () => void;
   onUpdated: () => void;
 }) {
-  const planDisabledPerms = initial.planDisabledPerms ?? [];
-  const tc = useTranslations("common");
   const t = useTranslations("users");
+  const tc = useTranslations("common");
+  const PERMISSION_LABELS = Object.fromEntries(
+    Object.entries(PERM_KEY_MAP).map(([perm, key]) => [perm, t(key as any)]),
+  );
   const [form, setForm] = useState<UserEditState>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -695,7 +704,7 @@ function EditModal({
       return;
     }
     if (!res.ok) {
-      setError(getApiError(data, "Failed to update user."));
+      setError(getApiError(data, t("failedUpdateUser")));
       return;
     }
     onUpdated();
@@ -712,19 +721,20 @@ function EditModal({
   const allowedPerms = isEmployee ? initial.adminPermissions : undefined;
 
   // Strip planDisabledPerms from selected permissions on render to prevent stale state
+  const planDisabledPerms = initial.planDisabledPerms ?? [];
   const effectivePermissions = form.permissions.filter(
     (p) => !planDisabledPerms.includes(p),
   );
 
   const statusOptions = [
-    { value: 1, label: "Active" },
-    { value: 2, label: "Inactive" },
-    { value: 3, label: "Suspended" },
-    { value: 4, label: "Pending" },
-    { value: 6, label: "Banned" },
+    { value: 1, label: t("statusActive") },
+    { value: 2, label: t("statusInactive") },
+    { value: 3, label: t("statusSuspended") },
+    { value: 4, label: t("statusPending") },
+    { value: 6, label: t("statusBanned") },
   ];
 
-  const roleCfg = ROLE_CONFIG[form.roleId];
+  const roleCfg = getRoleConfig(form.roleId, t as any);
 
   const content = (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
@@ -762,16 +772,15 @@ function EditModal({
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold text-blue-900">
-                Reports to Admin
+                {t("reportsToAdmin")}
               </p>
               <p className="text-sm font-bold text-blue-700">
-                {form.adminName ?? "Unknown Admin"}
+                {form.adminName ?? t("unknownAdmin")}
               </p>
             </div>
             <div className="ml-auto text-right flex-shrink-0">
               <p className="text-[10px] uppercase tracking-wide text-blue-400 font-semibold">
-                Admin has {allowedPerms?.length ?? "?"} permission
-                {(allowedPerms?.length ?? 0) !== 1 ? "s" : ""}
+                {t("adminHasPermissions", { count: allowedPerms?.length ?? 0 })}
               </p>
               <div className="mt-0.5 flex flex-wrap justify-end gap-1">
                 {(allowedPerms ?? []).slice(0, 3).map((p) => (
@@ -789,7 +798,7 @@ function EditModal({
                 )}
                 {(allowedPerms?.length ?? 0) === 0 && (
                   <span className="text-[10px] text-blue-400 italic">
-                    No permissions
+                    {t("noPermissions")}
                   </span>
                 )}
               </div>
@@ -808,7 +817,7 @@ function EditModal({
           )}
           {permWarn && (
             <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
-              <p className="font-semibold">⚠️ Permission conflict</p>
+              <p className="font-semibold">⚠️ {t("permConflict")}</p>
               <p className="mt-0.5">{permWarn}</p>
               {outOfScope.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
@@ -823,8 +832,7 @@ function EditModal({
                 </div>
               )}
               <p className="mt-2 text-xs text-amber-600">
-                Please deselect the highlighted permissions above, or update the
-                admin's permissions first.
+                {t("permConflictHint")}
               </p>
             </div>
           )}
@@ -883,7 +891,7 @@ function EditModal({
               </select>
             </FieldGroup>
           )}
-          <FieldGroup label={`${t("password")} (leave blank to keep)`}>
+          <FieldGroup label={`${t("password")} (${t("leaveBlankPassword")})`}>
             <input
               type="password"
               value={form.password}
@@ -898,7 +906,7 @@ function EditModal({
                 {t("permissions")}
                 {isAdmin && (
                   <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-normal text-blue-600 border border-blue-200">
-                    Admin-level · changes cascade to employees
+                    {t("adminLevelCascade")}
                   </span>
                 )}
               </label>
@@ -920,11 +928,7 @@ function EditModal({
                   ).length ?? 0) && (
                   <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-700">
                     <span>⚠️</span>
-                    <span>
-                      Removing permissions from this admin will{" "}
-                      <strong>automatically revoke</strong> those permissions
-                      from all their employees.
-                    </span>
+                    <span>{t("removingAdminPermsWarning")}</span>
                   </p>
                 )}
             </div>
@@ -959,8 +963,9 @@ function EditModal({
 export default function UsersPage() {
   const t = useTranslations("users");
   const tc = useTranslations("common");
-  const isArabic = t("title") === "أعضاء الفريق";
-  const tr = (en: string, ar: string) => (isArabic ? ar : en);
+  const PERMISSION_LABELS = Object.fromEntries(
+    Object.entries(PERM_KEY_MAP).map(([perm, key]) => [perm, t(key as any)]),
+  );
   const { data: session } = useSession();
   const sessionUser = session?.user as ExtendedSessionUser | undefined;
 
@@ -1224,8 +1229,9 @@ export default function UsersPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
           <p className="mt-0.5 text-sm text-slate-500">
-            {stats.total} total · {stats.admins} admins · {stats.employees}{" "}
-            employees · {stats.active} active
+            {stats.total} {t("name")} · {stats.admins} {t("adminRole")} ·{" "}
+            {stats.employees} {t("employeeRole")} · {stats.active}{" "}
+            {t("statusActive")}
           </p>
         </div>
         {canManageUsers && (
@@ -1246,7 +1252,7 @@ export default function UsersPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             {
-              label: "Total Users",
+              label: t("name"),
               value: stats.total,
               cls: "bg-slate-50 border-slate-200",
               text: "text-slate-700",
@@ -1264,7 +1270,7 @@ export default function UsersPage() {
               text: "text-emerald-700",
             },
             {
-              label: "Active",
+              label: t("statusActive"),
               value: stats.active,
               cls: "bg-green-50 border-green-200",
               text: "text-green-700",
@@ -1283,7 +1289,7 @@ export default function UsersPage() {
         <div className="flex rounded-lg border border-slate-200 bg-white p-1 text-sm shadow-sm">
           {(
             [
-              { key: "all", label: `${tr("All", "الكل")} (${stats.total})` },
+              { key: "all", label: `${tc("filter")} (${stats.total})` },
               { key: "admins", label: `${t("adminRole")} (${stats.admins})` },
               {
                 key: "employees",
@@ -1355,7 +1361,7 @@ export default function UsersPage() {
                 </th>
                 {isSuperAdmin && (
                   <th className="px-4 py-3.5 text-start font-semibold">
-                    Admin / Workspace
+                    {t("adminRole")} / {t("workspaceName")}
                   </th>
                 )}
                 <th className="px-4 py-3.5 text-start font-semibold">
@@ -1420,7 +1426,7 @@ export default function UsersPage() {
                 const canManage = canManageRow(row);
                 const isCurrentUser = row.id === sessionUserId;
                 const busy = busyId === row.id;
-                const roleCfg = ROLE_CONFIG[row.roleId];
+                const roleCfg = getRoleConfig(row.roleId, t as any);
                 const adminRow =
                   row.roleId === USER_ROLES.VENDOR_USER && row.vendorId
                     ? (adminByVendorId.get(row.vendorId) ?? null)
@@ -1491,8 +1497,8 @@ export default function UsersPage() {
                             )}
                             <p className="mt-0.5 text-[11px] text-slate-400">
                               {perms.length === 0
-                                ? "No permissions → all employees inherit none"
-                                : `${perms.length} permission${perms.length !== 1 ? "s" : ""} → employees inherit these`}
+                                ? t("noPermissions")
+                                : `${perms.length} ${t("permissions")}`}
                             </p>
                           </div>
                         ) : // Employee row: show admin info card
@@ -1542,7 +1548,7 @@ export default function UsersPage() {
                         />
                       ) : (
                         <span className="text-[11px] italic text-slate-300">
-                          No permissions
+                          {t("noPermissions")}
                         </span>
                       )}
                     </td>
@@ -1571,7 +1577,7 @@ export default function UsersPage() {
                               onClick={() => banUser(row.id)}
                               className="rounded-md px-2.5 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50 disabled:opacity-40 transition-colors"
                             >
-                              Ban
+                              {t("statusBanned")}
                             </button>
                           )}
                           {canManage && row.status === 6 && (
@@ -1581,7 +1587,7 @@ export default function UsersPage() {
                               onClick={() => unbanUser(row.id)}
                               className="rounded-md px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-40 transition-colors"
                             >
-                              Unban
+                              {t("statusActive")}
                             </button>
                           )}
                           {canManage && !isCurrentUser && (

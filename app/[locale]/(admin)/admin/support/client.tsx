@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { Link } from '@/i18n/navigation';
+import { useState } from "react";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 
 type Reply = { id: string; content: string; isAdmin: boolean; createdAt: Date };
 type Vendor = { id: string; title: string | null; uid: string };
@@ -19,17 +19,17 @@ type Ticket = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  open: 'bg-blue-100 text-blue-700',
-  in_progress: 'bg-amber-100 text-amber-700',
-  resolved: 'bg-green-100 text-green-700',
-  closed: 'bg-gray-100 text-gray-500',
+  open: "bg-blue-100 text-blue-700",
+  in_progress: "bg-amber-100 text-amber-700",
+  resolved: "bg-green-100 text-green-700",
+  closed: "bg-gray-100 text-gray-500",
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  low: 'bg-gray-100 text-gray-500',
-  normal: 'bg-blue-50 text-blue-600',
-  high: 'bg-orange-100 text-orange-700',
-  urgent: 'bg-red-100 text-red-700',
+  low: "bg-gray-100 text-gray-500",
+  normal: "bg-blue-50 text-blue-600",
+  high: "bg-orange-100 text-orange-700",
+  urgent: "bg-red-100 text-red-700",
 };
 
 export default function AdminSupportClient({
@@ -45,11 +45,11 @@ export default function AdminSupportClient({
   limit: number;
   statusFilter: string;
 }) {
-  const tAdmin = useTranslations('admin');
-  const tCommon = useTranslations('common');
+  const tAdmin = useTranslations("admin");
+  const tCommon = useTranslations("common");
   const [tickets, setTickets] = useState(initialTickets);
   const [selected, setSelected] = useState<Ticket | null>(null);
-  const [reply, setReply] = useState('');
+  const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
 
@@ -57,28 +57,30 @@ export default function AdminSupportClient({
   const hasPrev = page > 1;
   const hasNext = page < totalPages;
 
-  const STATUSES = ['', 'open', 'in_progress', 'resolved', 'closed'];
+  const STATUSES = ["", "open", "in_progress", "resolved", "closed"];
 
   const handleSendReply = async () => {
     if (!reply.trim() || !selected) return;
     setSending(true);
     try {
       const res = await fetch(`/api/support/tickets/${selected.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: reply }),
       });
       const data = await res.json();
       const updatedSelected = {
         ...selected,
         replies: [...selected.replies, data.reply],
-        status: 'in_progress',
+        status: "in_progress",
       };
       setSelected(updatedSelected);
       setTickets((prev) =>
-        prev.map((t) => (t.id === selected.id ? { ...t, status: 'in_progress' } : t))
+        prev.map((t) =>
+          t.id === selected.id ? { ...t, status: "in_progress" } : t,
+        ),
       );
-      setReply('');
+      setReply("");
     } finally {
       setSending(false);
     }
@@ -89,13 +91,15 @@ export default function AdminSupportClient({
     setChangingStatus(true);
     try {
       await fetch(`/api/support/tickets/${selected.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
       setSelected({ ...selected, status: newStatus });
       setTickets((prev) =>
-        prev.map((t) => (t.id === selected.id ? { ...t, status: newStatus } : t))
+        prev.map((t) =>
+          t.id === selected.id ? { ...t, status: newStatus } : t,
+        ),
       );
     } finally {
       setChangingStatus(false);
@@ -103,19 +107,27 @@ export default function AdminSupportClient({
   };
 
   const statusLabel = (s: string) => {
-    if (s === '') return tAdmin('statusAll');
-    if (s === 'open') return tCommon('open');
-    if (s === 'in_progress') return 'In Progress';
-    if (s === 'resolved') return 'Resolved';
-    if (s === 'closed') return tCommon('close');
+    if (s === "") return tAdmin("statusAll");
+    if (s === "open") return tAdmin("statusOpen");
+    if (s === "in_progress") return tAdmin("statusInProgress");
+    if (s === "resolved") return tAdmin("statusResolved");
+    if (s === "closed") return tAdmin("statusClosed");
     return s;
+  };
+
+  const priorityLabel = (p: string) => {
+    if (p === "low") return tAdmin("priorityLow");
+    if (p === "normal") return tAdmin("priorityNormal");
+    if (p === "high") return tAdmin("priorityHigh");
+    if (p === "urgent") return tAdmin("priorityUrgent");
+    return p;
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
         <h1 className="text-[40px] font-normal leading-none tracking-tight text-emerald-950">
-          {tAdmin('supportTickets')}
+          {tAdmin("supportTickets")}
         </h1>
         <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">
           {total}
@@ -126,12 +138,12 @@ export default function AdminSupportClient({
       <div className="flex flex-wrap gap-1.5">
         {STATUSES.map((s) => (
           <Link
-            key={s || 'all'}
+            key={s || "all"}
             href={`/admin/support?status=${s}`}
             className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
               statusFilter === s
-                ? 'bg-emerald-600 text-white'
-                : 'border border-slate-200 bg-white text-slate-600 hover:bg-emerald-50'
+                ? "bg-emerald-600 text-white"
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-emerald-50"
             }`}
           >
             {statusLabel(s)}
@@ -144,7 +156,7 @@ export default function AdminSupportClient({
         <div className="lg:col-span-2 space-y-2">
           {tickets.length === 0 && (
             <div className="rounded-xl border border-gray-100 bg-white p-6 text-center text-sm text-slate-400">
-              {tAdmin('noTickets')}
+              {tAdmin("noTickets")}
             </div>
           )}
           {tickets.map((ticket) => (
@@ -153,28 +165,32 @@ export default function AdminSupportClient({
               onClick={() => setSelected(ticket)}
               className={`cursor-pointer rounded-xl border p-4 transition-all ${
                 selected?.id === ticket.id
-                  ? 'border-emerald-400 bg-emerald-50'
-                  : 'border-gray-100 bg-white hover:border-emerald-200'
+                  ? "border-emerald-400 bg-emerald-50"
+                  : "border-gray-100 bg-white hover:border-emerald-200"
               }`}
             >
               <div className="mb-2 flex items-start justify-between gap-2">
-                <p className="line-clamp-1 text-sm font-semibold text-gray-900">{ticket.subject}</p>
+                <p className="line-clamp-1 text-sm font-semibold text-gray-900">
+                  {ticket.subject}
+                </p>
                 <span
                   className={`flex-shrink-0 rounded px-2 py-0.5 text-[11px] font-semibold ${
-                    STATUS_COLORS[ticket.status] ?? 'bg-gray-100 text-gray-500'
+                    STATUS_COLORS[ticket.status] ?? "bg-gray-100 text-gray-500"
                   }`}
                 >
-                  {ticket.status.replace('_', ' ')}
+                  {statusLabel(ticket.status)}
                 </span>
               </div>
-              <p className="text-xs text-gray-500">{ticket.vendor.title ?? ticket.vendor.uid}</p>
+              <p className="text-xs text-gray-500">
+                {ticket.vendor.title ?? ticket.vendor.uid}
+              </p>
               <div className="mt-2 flex items-center justify-between">
                 <span
                   className={`rounded px-2 py-0.5 text-[10px] font-semibold ${
-                    PRIORITY_COLORS[ticket.priority] ?? ''
+                    PRIORITY_COLORS[ticket.priority] ?? ""
                   }`}
                 >
-                  {ticket.priority}
+                  {priorityLabel(ticket.priority)}
                 </span>
                 <p className="text-[11px] text-gray-400">
                   {new Date(ticket.updatedAt).toLocaleDateString()}
@@ -189,26 +205,26 @@ export default function AdminSupportClient({
               href={`/admin/support?status=${statusFilter}&page=${Math.max(1, page - 1)}`}
               className={`rounded border px-3 py-1.5 text-xs font-semibold ${
                 hasPrev
-                  ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                  : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+                  ? "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                  : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
               }`}
               aria-disabled={!hasPrev}
             >
-              {tCommon('previous')}
+              {tCommon("previous")}
             </Link>
             <span className="text-xs text-gray-500">
-              {tCommon('page')} {page} / {totalPages}
+              {tCommon("page")} {page} / {totalPages}
             </span>
             <Link
               href={`/admin/support?status=${statusFilter}&page=${Math.min(totalPages, page + 1)}`}
               className={`rounded border px-3 py-1.5 text-xs font-semibold ${
                 hasNext
-                  ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                  : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+                  ? "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                  : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
               }`}
               aria-disabled={!hasNext}
             >
-              {tCommon('next')}
+              {tCommon("next")}
             </Link>
           </div>
         </div>
@@ -217,21 +233,24 @@ export default function AdminSupportClient({
         <div className="lg:col-span-3">
           {!selected ? (
             <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white text-sm text-gray-400">
-              {tAdmin('selectTicket')}
+              {tAdmin("selectTicket")}
             </div>
           ) : (
             <div
               className="flex flex-col rounded-2xl border border-gray-100 bg-white shadow-sm"
-              style={{ maxHeight: '76vh' }}
+              style={{ maxHeight: "76vh" }}
             >
               {/* Header */}
               <div className="border-b border-gray-100 px-5 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h2 className="font-bold text-gray-900">{selected.subject}</h2>
+                    <h2 className="font-bold text-gray-900">
+                      {selected.subject}
+                    </h2>
                     <p className="mt-0.5 text-xs text-gray-500">
                       {selected.vendor.title ?? selected.vendor.uid} &middot; #
-                      {selected.uid.slice(0, 8)} &middot; {tAdmin('priorityLabel')}:{' '}
+                      {selected.uid.slice(0, 8)} &middot;{" "}
+                      {tAdmin("priorityLabel")}:{" "}
                       <span className="capitalize">{selected.priority}</span>
                     </p>
                   </div>
@@ -241,10 +260,12 @@ export default function AdminSupportClient({
                     disabled={changingStatus}
                     className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 outline-none focus:border-emerald-400"
                   >
-                    <option value="open">{tCommon('open')}</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="resolved">Resolved</option>
-                    <option value="closed">{tCommon('close')}</option>
+                    <option value="open">{tAdmin("statusOpen")}</option>
+                    <option value="in_progress">
+                      {tAdmin("statusInProgress")}
+                    </option>
+                    <option value="resolved">{tAdmin("statusResolved")}</option>
+                    <option value="closed">{tAdmin("statusClosed")}</option>
                   </select>
                 </div>
               </div>
@@ -252,19 +273,26 @@ export default function AdminSupportClient({
               {/* Messages */}
               <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
                 {selected.replies.map((r) => (
-                  <div key={r.id} className={`flex ${r.isAdmin ? 'justify-end' : 'justify-start'}`}>
+                  <div
+                    key={r.id}
+                    className={`flex ${r.isAdmin ? "justify-end" : "justify-start"}`}
+                  >
                     <div
                       className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                        r.isAdmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-800'
+                        r.isAdmin
+                          ? "bg-emerald-600 text-white"
+                          : "bg-gray-100 text-gray-800"
                       }`}
                     >
                       {r.isAdmin && (
-                        <p className="mb-1 text-xs font-semibold text-emerald-200">Admin</p>
+                        <p className="mb-1 text-xs font-semibold text-emerald-200">
+                          {tAdmin("superAdministrator")}
+                        </p>
                       )}
                       <p className="whitespace-pre-wrap">{r.content}</p>
                       <p
                         className={`mt-1.5 text-[11px] ${
-                          r.isAdmin ? 'text-emerald-200' : 'text-gray-400'
+                          r.isAdmin ? "text-emerald-200" : "text-gray-400"
                         }`}
                       >
                         {new Date(r.createdAt).toLocaleString()}
@@ -275,13 +303,13 @@ export default function AdminSupportClient({
               </div>
 
               {/* Reply */}
-              {selected.status !== 'closed' ? (
+              {selected.status !== "closed" ? (
                 <div className="border-t border-gray-100 px-5 py-4">
                   <textarea
                     rows={3}
                     value={reply}
                     onChange={(e) => setReply(e.target.value)}
-                    placeholder={tAdmin('typeReply')}
+                    placeholder={tAdmin("typeReply")}
                     className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                   />
                   <div className="mt-2 flex justify-end">
@@ -290,13 +318,13 @@ export default function AdminSupportClient({
                       disabled={sending || !reply.trim()}
                       className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
                     >
-                      {sending ? tAdmin('sending') : tAdmin('sendReply')}
+                      {sending ? tAdmin("sending") : tAdmin("sendReply")}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="border-t border-gray-100 px-5 py-3 text-center text-xs text-gray-400">
-                  {tAdmin('ticketClosed')}
+                  {tAdmin("ticketClosed")}
                 </div>
               )}
             </div>

@@ -36,7 +36,7 @@ export default function SettingsProfilePage() {
   return (
     <>
       <SettingsTabs activeTab="profile" className="mb-6" />
-      <div className="max-w-3xl bg-white rounded-2xl border border-emerald-100 shadow-sm p-6">
+      <div className="w-full bg-white rounded-2xl border border-emerald-100 shadow-sm p-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">
           {t("profile")}
         </h1>

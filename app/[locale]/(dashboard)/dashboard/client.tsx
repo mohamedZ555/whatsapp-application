@@ -323,6 +323,7 @@ function AdminDashboard({
   loading: boolean;
 }) {
   const t = useTranslations("dashboard");
+  const tSub = useTranslations("subscription");
 
   if (loading) {
     return (
@@ -427,7 +428,9 @@ function AdminDashboard({
                 <div key={item.key} className="space-y-1.5">
                   <div className="flex justify-between text-xs">
                     <span className="font-medium text-slate-600">
-                      {item.label}
+                      {tSub(`usageLabel.${item.key}` as any, {
+                        default: item.key,
+                      })}
                     </span>
                     <span
                       className={

@@ -144,7 +144,7 @@ export default function SettingsWhatsappPage() {
   ];
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className=" space-y-6">
       {/* Navigation Tabs */}
       <SettingsTabs activeTab="whatsapp" />
 
