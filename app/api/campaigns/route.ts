@@ -3,13 +3,11 @@ import { getServerSession } from 'next-auth';
 import type { Prisma } from '@prisma/client';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { checkLimit } from '@/lib/permissions';
 import {
   getActorFromSession,
   isSuperAdmin,
   resolveOptionalVendorFilter,
   resolveRequiredVendorId,
-  shouldBypassPlanLimits,
 } from '@/lib/rbac';
 
 export async function GET(req: NextRequest) {
@@ -49,10 +47,7 @@ export async function POST(req: NextRequest) {
   const vendorId = resolveRequiredVendorId(actor, payload.vendorId);
   if (!vendorId) return NextResponse.json({ error: 'Vendor is required.' }, { status: 400 });
 
-  if (!shouldBypassPlanLimits(actor)) {
-    const canCreate = await checkLimit(vendorId, 'campaignsPerMonth');
-    if (!canCreate) return NextResponse.json({ error: 'Campaign limit reached. Please upgrade.' }, { status: 403 });
-  }
+  // Campaigns are unlimited — no plan limit enforced
 
   const { name, templateId, scheduledAt, data, contactIds } = payload;
   if (!name) return NextResponse.json({ error: 'Campaign name is required.' }, { status: 400 });

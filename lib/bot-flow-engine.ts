@@ -403,6 +403,13 @@ export async function processBotAutomation(
       where: { id: String(state.flowId), vendorId, status: 1 },
       select: { id: true, data: true },
     });
+    if (!flow) {
+      // Flow deleted or deactivated — clear stale state and fall through
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: { data: mergeContactData(contact.data, { botFlowState: null }) },
+      });
+    }
     if (flow) {
       const { nodesMap } = resolveNodes(flow.data);
       const waitingNode = nodesMap.get(String(state.waitingNodeId));

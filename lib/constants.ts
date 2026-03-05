@@ -5,9 +5,8 @@ export const PLANS = {
     enabled: true,
     features: {
       contacts: 2,
-      campaignsPerMonth: 10,
       botReplies: 10,
-      botFlows: 5,
+      botFlowNodes: 50, // total nodes across ALL bot flows
       contactCustomFields: 2,
       teamMembers: 0,
       aiChatBot: true,
@@ -23,9 +22,8 @@ export const PLANS = {
     enabled: true,
     features: {
       contacts: 500,
-      campaignsPerMonth: 50,
       botReplies: 50,
-      botFlows: 20,
+      botFlowNodes: 250, // total nodes across ALL bot flows
       contactCustomFields: 10,
       teamMembers: 5,
       aiChatBot: true,
@@ -41,9 +39,8 @@ export const PLANS = {
     enabled: true,
     features: {
       contacts: 5000,
-      campaignsPerMonth: 200,
       botReplies: 200,
-      botFlows: 50,
+      botFlowNodes: 1000, // total nodes across ALL bot flows
       contactCustomFields: 25,
       teamMembers: 10,
       aiChatBot: true,
@@ -59,9 +56,8 @@ export const PLANS = {
     enabled: true,
     features: {
       contacts: -1,
-      campaignsPerMonth: -1,
       botReplies: -1,
-      botFlows: -1,
+      botFlowNodes: -1, // unlimited total nodes
       contactCustomFields: -1,
       teamMembers: -1,
       aiChatBot: true,

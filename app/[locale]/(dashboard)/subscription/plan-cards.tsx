@@ -158,17 +158,14 @@ export function SubscriptionPlanCards({
                 </li>
                 <li>
                   ✓{" "}
-                  {featureVal(
-                    plan.features.campaignsPerMonth,
-                    t("campaignsFeature"),
-                  )}
-                </li>
-                <li>
-                  ✓{" "}
                   {featureVal(plan.features.botReplies, t("botRepliesFeature"))}
                 </li>
                 <li>
-                  ✓ {featureVal(plan.features.botFlows, t("botFlowsFeature"))}
+                  ✓{" "}
+                  {featureVal(
+                    plan.features.botFlowNodes ?? -1,
+                    t("botFlowNodesFeature"),
+                  )}
                 </li>
                 <li>
                   ✓{" "}

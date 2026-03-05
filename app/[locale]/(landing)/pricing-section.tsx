@@ -110,15 +110,11 @@ export default function PricingSection({ plans }: Props) {
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckIcon />
-                    <span>{t('pricing.campaigns')}: <strong>{fmt(plan.features.campaignsPerMonth)}</strong></span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckIcon />
                     <span>{t('pricing.botReplies')}: <strong>{fmt(plan.features.botReplies)}</strong></span>
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckIcon />
-                    <span>{t('pricing.botFlows')}: <strong>{fmt(plan.features.botFlows)}</strong></span>
+                    <span>{t('pricing.botFlowNodes')}: <strong>{fmt(plan.features.botFlowNodes ?? -1)}</strong></span>
                   </li>
                   <li className="flex items-center gap-2">
                     {plan.features.teamMembers !== 0 ? <CheckIcon /> : <XIcon />}

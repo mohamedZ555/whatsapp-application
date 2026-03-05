@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { getActorFromSession, isSuperAdmin } from '@/lib/rbac';
+import { getActorFromSession, isSuperAdmin, shouldBypassPlanLimits } from '@/lib/rbac';
+import { checkFlowNodeLimit } from '@/lib/permissions';
 
 function flowScope(actor: ReturnType<typeof getActorFromSession>, id: string, vendorId?: string) {
   if (!actor) return { id: '__forbidden__' };
@@ -37,9 +38,22 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const vendorIdParam = body.vendorId as string | undefined;
   const existing = await prisma.botFlow.findFirst({
     where: flowScope(actor, id, vendorIdParam),
-    select: { id: true },
+    select: { id: true, vendorId: true },
   });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  // Enforce total node count limit when saving flow data
+  if (body.data !== undefined && !shouldBypassPlanLimits(actor)) {
+    const incomingNodes = Array.isArray(body.data?.nodes) ? body.data.nodes : [];
+    // Exclude this flow from the total count (its nodes will be replaced)
+    const withinLimit = await checkFlowNodeLimit(existing.vendorId, incomingNodes.length, id);
+    if (!withinLimit) {
+      return NextResponse.json(
+        { error: 'Total node limit reached for your plan. Please upgrade to add more nodes.' },
+        { status: 403 },
+      );
+    }
+  }
 
   const updated = await prisma.botFlow.update({
     where: { id },

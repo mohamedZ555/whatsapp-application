@@ -65,15 +65,13 @@ const VENDOR_PATH_RULES: AccessRule[] = [...EXTRA_VENDOR_PATH_RULES, ...DASHBOAR
  */
 export function computePlanDisabledPerms(features: {
   teamMembers: number;
-  campaignsPerMonth: number;
   botReplies: number;
-  botFlows: number;
+  botFlowNodes: number;
   contacts: number;
 }): string[] {
   const disabled: string[] = [];
   if (features.teamMembers === 0) disabled.push('manage_users');
-  if (features.campaignsPerMonth === 0) disabled.push('manage_campaigns');
-  if (features.botReplies === 0 && features.botFlows === 0) disabled.push('manage_bot_replies');
+  if (features.botReplies === 0 && features.botFlowNodes === 0) disabled.push('manage_bot_replies');
   if (features.contacts === 0) disabled.push('manage_contacts');
   return disabled;
 }

@@ -21,6 +21,7 @@ type ReplyForm = {
 };
 
 type JobCategory = { id: string; name: string; color: string };
+type TeamUser = { id: string; firstName: string; lastName: string };
 
 type Flow = {
   id: string;
@@ -95,6 +96,9 @@ export default function BotRepliesPage() {
   const [flows, setFlows] = useState<Flow[]>([]);
   const [loadingFlows, setLoadingFlows] = useState(true);
   const [categories, setCategories] = useState<JobCategory[]>([]);
+  const [users, setUsers] = useState<TeamUser[]>([]);
+  const [totalNodesLimit, setTotalNodesLimit] = useState<number>(-1);
+  const [totalNodesUsed, setTotalNodesUsed] = useState<number>(0);
   const [showCreateFlow, setShowCreateFlow] = useState(false);
   const [newFlowName, setNewFlowName] = useState("");
   const [creatingFlow, setCreatingFlow] = useState(false);
@@ -124,10 +128,31 @@ export default function BotRepliesPage() {
     setCategories(Array.isArray(data.categories) ? data.categories : []);
   }
 
+  async function fetchUsers() {
+    const res = await fetch("/api/users");
+    const data = await res.json();
+    const list = Array.isArray(data.users) ? data.users : [];
+    setUsers(list.map((u: any) => ({ id: u.userId ?? u.id, firstName: u.firstName ?? "", lastName: u.lastName ?? "" })));
+  }
+
+  async function fetchNodeLimit() {
+    const res = await fetch("/api/subscription/usage");
+    if (!res.ok) return;
+    const data = await res.json();
+    const limit = data.plan?.features?.botFlowNodes;
+    if (typeof limit === "number") setTotalNodesLimit(limit);
+    const usageItem = Array.isArray(data.items)
+      ? data.items.find((i: any) => i.key === "botFlowNodes")
+      : null;
+    if (usageItem) setTotalNodesUsed(usageItem.used ?? 0);
+  }
+
   useEffect(() => {
     fetchReplies();
     fetchFlows();
     fetchCategories();
+    fetchUsers();
+    fetchNodeLimit();
   }, []);
 
   // ── Option item helpers ──────────────────────────────────────────────────
@@ -322,14 +347,27 @@ export default function BotRepliesPage() {
   // ── Open visual builder ──────────────────────────────────────────────────
 
   if (builderFlow) {
+    // Compute how many nodes this specific flow can have:
+    // total limit - nodes used in OTHER flows
+    const currentFlowNodeCount = Array.isArray(builderFlow.data?.nodes)
+      ? builderFlow.data.nodes.length
+      : 0;
+    const effectiveNodeLimit =
+      totalNodesLimit === -1
+        ? -1
+        : totalNodesLimit - (totalNodesUsed - currentFlowNodeCount);
+
     return (
       <FlowBuilder
         flow={builderFlow}
         categories={categories}
+        users={users}
+        nodeLimitPerFlow={effectiveNodeLimit}
         onClose={() => setBuilderFlow(null)}
         onSaved={() => {
           setBuilderFlow(null);
           fetchFlows();
+          fetchNodeLimit();
         }}
       />
     );
@@ -833,10 +871,23 @@ export default function BotRepliesPage() {
         <div>
           {/* Toolbar */}
           <div className="mb-5 flex items-center justify-between">
-            <p className="text-sm text-gray-500">
-              {flows.length} {t("botFlows").toLowerCase()} · {categories.length}{" "}
-              {t("jobCategoriesTitle").toLowerCase()}
-            </p>
+            <div className="flex items-center gap-3 text-sm text-gray-500">
+              <span>
+                {flows.length} {t("botFlows").toLowerCase()} · {categories.length}{" "}
+                {t("jobCategoriesTitle").toLowerCase()}
+              </span>
+              {totalNodesLimit !== -1 && (
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    totalNodesUsed >= totalNodesLimit
+                      ? "bg-red-100 text-red-700"
+                      : "bg-emerald-50 text-emerald-700"
+                  }`}
+                >
+                  {t("totalNodes")}: {totalNodesUsed} / {totalNodesLimit}
+                </span>
+              )}
+            </div>
             <button
               onClick={() => setShowCreateFlow(true)}
               className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors shadow-sm"

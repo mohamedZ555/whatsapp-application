@@ -3,9 +3,8 @@ import { PLANS } from '@/lib/constants';
 
 export type PlanFeatures = {
   contacts: number;
-  campaignsPerMonth: number;
   botReplies: number;
-  botFlows: number;
+  botFlowNodes: number; // total nodes allowed across ALL bot flows (-1 = unlimited)
   contactCustomFields: number;
   teamMembers: number;
   aiChatBot: boolean;

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { checkLimit } from '@/lib/permissions';
+import { checkFlowNodeLimit } from '@/lib/permissions';
 import {
   getActorFromSession,
   isSuperAdmin,
@@ -40,8 +40,12 @@ export async function POST(req: NextRequest) {
   if (!vendorId) return NextResponse.json({ error: 'Vendor is required.' }, { status: 400 });
 
   if (!shouldBypassPlanLimits(actor)) {
-    const canAdd = await checkLimit(vendorId, 'botFlows');
-    if (!canAdd) return NextResponse.json({ error: 'Bot flow limit reached. Please upgrade.' }, { status: 403 });
+    // Check total node limit (new flow nodes count toward the vendor's total)
+    const initialNodes = Array.isArray(body.data?.nodes) ? body.data.nodes : [];
+    const withinNodeLimit = await checkFlowNodeLimit(vendorId, initialNodes.length);
+    if (!withinNodeLimit) {
+      return NextResponse.json({ error: 'Total node limit reached for your plan. Please upgrade to add more nodes.' }, { status: 403 });
+    }
   }
 
   const flowName = String(body.flowName ?? '').trim();

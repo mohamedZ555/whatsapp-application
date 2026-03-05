@@ -6,9 +6,8 @@ import { useTranslations } from 'next-intl';
 
 type PlanFeatures = {
   contacts: number;
-  campaignsPerMonth: number;
   botReplies: number;
-  botFlows: number;
+  botFlowNodes: number;
   contactCustomFields: number;
   teamMembers: number;
   aiChatBot: boolean;
@@ -130,9 +129,8 @@ function EditPlanModal({
               {(
                 [
                   { key: 'contacts', labelKey: 'contacts' },
-                  { key: 'campaignsPerMonth', labelKey: 'campaignsPerMonth' },
                   { key: 'botReplies', labelKey: 'botReplies' },
-                  { key: 'botFlows', labelKey: 'botFlows' },
+                  { key: 'botFlowNodes', labelKey: 'botFlowNodes' },
                   { key: 'contactCustomFields', labelKey: 'customFields' },
                   { key: 'teamMembers', labelKey: 'teamMembers' },
                 ] as const
@@ -345,9 +343,8 @@ export default function AdminPlansPage() {
 
               <div className="border-t border-gray-100 pt-3 space-y-1 text-xs text-gray-500">
                 <div className="flex justify-between"><span>{tAdmin('contacts')}</span><span className="font-medium text-gray-700">{featureDisplay(plan.features.contacts)}</span></div>
-                <div className="flex justify-between"><span>{tAdmin('campaignsPerMonth')}</span><span className="font-medium text-gray-700">{featureDisplay(plan.features.campaignsPerMonth)}</span></div>
                 <div className="flex justify-between"><span>{tAdmin('botReplies')}</span><span className="font-medium text-gray-700">{featureDisplay(plan.features.botReplies)}</span></div>
-                <div className="flex justify-between"><span>{tAdmin('botFlows')}</span><span className="font-medium text-gray-700">{featureDisplay(plan.features.botFlows)}</span></div>
+                <div className="flex justify-between"><span>{tAdmin('botFlowNodes')}</span><span className="font-medium text-gray-700">{featureDisplay(plan.features.botFlowNodes ?? -1)}</span></div>
                 <div className="flex justify-between"><span>{tAdmin('teamMembers')}</span><span className="font-medium text-gray-700">{plan.features.teamMembers === 0 ? tAdmin('noneLabel') : featureDisplay(plan.features.teamMembers)}</span></div>
                 <div className="flex justify-between"><span>{tAdmin('aiChatbot')}</span><span className={plan.features.aiChatBot ? 'text-emerald-600 font-medium' : 'text-gray-400'}>{plan.features.aiChatBot ? tCommon('yes') : tCommon('no')}</span></div>
                 <div className="flex justify-between"><span>{tAdmin('apiAccess')}</span><span className={plan.features.apiAccess ? 'text-emerald-600 font-medium' : 'text-gray-400'}>{plan.features.apiAccess ? tCommon('yes') : tCommon('no')}</span></div>

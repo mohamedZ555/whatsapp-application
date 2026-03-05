@@ -11,6 +11,8 @@ type NodeType =
   | "send_list"
   | "condition_text"
   | "assign_category"
+  | "assign_user"
+  | "set_contact_attribute"
   | "end";
 
 type ButtonOption = {
@@ -43,12 +45,21 @@ type FlowNodeData = {
   listButtonText?: string;
   sections?: Array<{ title?: string; rows: ListRow[] }>;
   categoryId?: string; // for assign_category node
+  userId?: string; // for assign_user node
+  field?: string; // for set_contact_attribute node
+  fieldValue?: string; // for set_contact_attribute node
 };
 
 type JobCategory = {
   id: string;
   name: string;
   color: string;
+};
+
+type TeamUser = {
+  id: string;
+  firstName: string;
+  lastName: string;
 };
 
 type Props = {
@@ -59,6 +70,8 @@ type Props = {
     status: number;
   };
   categories: JobCategory[];
+  users?: TeamUser[];
+  nodeLimitPerFlow?: number; // -1 = unlimited, plan-based
   onClose: () => void;
   onSaved: () => void;
 };
@@ -107,6 +120,18 @@ const COLORS: Record<
     badge: "#16a34a",
     text: "#4ade80",
   },
+  assign_user: {
+    bg: "#1a1a2e",
+    border: "#7c3aed",
+    badge: "#7c3aed",
+    text: "#c4b5fd",
+  },
+  set_contact_attribute: {
+    bg: "#1a1a2e",
+    border: "#0e7490",
+    badge: "#0e7490",
+    text: "#67e8f9",
+  },
   end: { bg: "#1a1a2e", border: "#6b7280", badge: "#6b7280", text: "#9ca3af" },
 };
 
@@ -117,6 +142,8 @@ const NODE_LABELS: Record<NodeType, string> = {
   send_list: "Send List",
   condition_text: "Condition",
   assign_category: "Assign Category",
+  assign_user: "Assign User",
+  set_contact_attribute: "Set Attribute",
   end: "End",
 };
 
@@ -127,6 +154,8 @@ const NODE_ICONS: Record<NodeType, string> = {
   send_list: "📋",
   condition_text: "⚡",
   assign_category: "👥",
+  assign_user: "👤",
+  set_contact_attribute: "✏️",
   end: "⏹",
 };
 
@@ -153,6 +182,9 @@ function parseFlowData(data: any): FlowNodeData[] {
     listButtonText: n.listButtonText,
     sections: n.sections,
     categoryId: n.categoryId,
+    userId: n.userId,
+    field: n.field,
+    fieldValue: n.fieldValue,
   }));
 }
 
@@ -175,6 +207,9 @@ function serializeNodes(
     if (n.listButtonText) base.listButtonText = n.listButtonText;
     if (n.sections) base.sections = n.sections;
     if (n.categoryId) base.categoryId = n.categoryId;
+    if (n.userId) base.userId = n.userId;
+    if (n.field !== undefined) base.field = n.field;
+    if (n.fieldValue !== undefined) base.fieldValue = n.fieldValue;
     return base;
   });
   return { trigger, startNodeId, nodes: serialized };
@@ -192,6 +227,10 @@ function getNodeHeight(node: FlowNodeData): number {
       return 130;
     case "assign_category":
       return 100;
+    case "assign_user":
+      return 100;
+    case "set_contact_attribute":
+      return 110;
     default:
       return NODE_MIN_HEIGHT;
   }
@@ -295,6 +334,8 @@ function cubicBezier(
 export default function FlowBuilder({
   flow,
   categories,
+  users = [],
+  nodeLimitPerFlow = -1,
   onClose,
   onSaved,
 }: Props) {
@@ -500,45 +541,58 @@ export default function FlowBuilder({
 
   // ── Add node ──────────────────────────────────────────────────────────────
 
-  const addNode = useCallback((type: NodeType) => {
-    const id = generateId();
-    const newNode: FlowNodeData = {
-      id,
-      type,
-      x: 100 + Math.random() * 200,
-      y: 100 + Math.random() * 300,
-      text:
-        type === "send_text"
-          ? "Enter your message here"
-          : type === "send_buttons"
-            ? "Choose an option:"
-            : "",
-      buttons:
-        type === "send_buttons"
-          ? [
-              { id: `btn_1_${id}`, title: "Option 1" },
-              { id: `btn_2_${id}`, title: "Option 2" },
-            ]
-          : undefined,
-      sections:
-        type === "send_list"
-          ? [
-              {
-                title: "Options",
-                rows: [
-                  { id: `row_1_${id}`, title: "Row 1" },
-                  { id: `row_2_${id}`, title: "Row 2" },
-                ],
-              },
-            ]
-          : undefined,
-      listButtonText: type === "send_list" ? "View Options" : undefined,
-      operator: type === "condition_text" ? "contains" : undefined,
-      value: type === "condition_text" ? "" : undefined,
-    };
-    setNodes((prev) => [...prev, newNode]);
-    setSelectedNode(id);
-  }, []);
+  const addNode = useCallback(
+    (type: NodeType) => {
+      // Enforce node limit per flow
+      if (nodeLimitPerFlow !== -1 && nodes.length >= nodeLimitPerFlow) return;
+
+      const id = generateId();
+      const newNode: FlowNodeData = {
+        id,
+        type,
+        x: 100 + Math.random() * 200,
+        y: 100 + Math.random() * 300,
+        text:
+          type === "send_text"
+            ? "Enter your message here"
+            : type === "send_buttons"
+              ? "Choose an option:"
+              : type === "assign_user"
+                ? ""
+                : type === "set_contact_attribute"
+                  ? ""
+                  : "",
+        buttons:
+          type === "send_buttons"
+            ? [
+                { id: `btn_1_${id}`, title: "Option 1" },
+                { id: `btn_2_${id}`, title: "Option 2" },
+              ]
+            : undefined,
+        sections:
+          type === "send_list"
+            ? [
+                {
+                  title: "Options",
+                  rows: [
+                    { id: `row_1_${id}`, title: "Row 1" },
+                    { id: `row_2_${id}`, title: "Row 2" },
+                  ],
+                },
+              ]
+            : undefined,
+        listButtonText: type === "send_list" ? "View Options" : undefined,
+        operator: type === "condition_text" ? "contains" : undefined,
+        value: type === "condition_text" ? "" : undefined,
+        userId: type === "assign_user" ? undefined : undefined,
+        field: type === "set_contact_attribute" ? "firstName" : undefined,
+        fieldValue: type === "set_contact_attribute" ? "" : undefined,
+      };
+      setNodes((prev) => [...prev, newNode]);
+      setSelectedNode(id);
+    },
+    [nodes.length, nodeLimitPerFlow],
+  );
 
   const deleteNode = useCallback(
     (id: string) => {
@@ -569,16 +623,24 @@ export default function FlowBuilder({
 
   // ── Save ──────────────────────────────────────────────────────────────────
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const handleSave = useCallback(async () => {
     setSaving(true);
+    setSaveError(null);
     const sId = startNodeId || nodes[0]?.id || "";
     const data = serializeNodes(nodes, sId, trigger);
-    await fetch(`/api/bot-flows/${flow.id}`, {
+    const res = await fetch(`/api/bot-flows/${flow.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ flowName, data }),
     });
     setSaving(false);
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      setSaveError(json.error ?? "Failed to save flow.");
+      return;
+    }
     onSaved();
   }, [nodes, flowName, trigger, startNodeId, flow.id, onSaved]);
 
@@ -767,6 +829,29 @@ export default function FlowBuilder({
         </button>
       </div>
 
+      {/* Save error banner */}
+      {saveError && (
+        <div
+          style={{
+            background: "#7f1d1d",
+            color: "#fca5a5",
+            fontSize: 12,
+            padding: "8px 16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <span>⚠️ {saveError}</span>
+          <button
+            onClick={() => setSaveError(null)}
+            style={{ background: "none", border: "none", color: "#fca5a5", cursor: "pointer", fontSize: 14 }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* ── Left Palette ── */}
         <div
@@ -793,30 +878,72 @@ export default function FlowBuilder({
           >
             Add Node
           </p>
+
+          {/* Node count / limit display */}
+          <div
+            style={{
+              background:
+                nodeLimitPerFlow !== -1 && nodes.length >= nodeLimitPerFlow
+                  ? "#3b1515"
+                  : "#1a1a2e",
+              border: `1px solid ${nodeLimitPerFlow !== -1 && nodes.length >= nodeLimitPerFlow ? "#ef4444" : "#27274a"}`,
+              borderRadius: 6,
+              padding: "5px 8px",
+              marginBottom: 4,
+            }}
+          >
+            <p
+              style={{
+                fontSize: 10,
+                color:
+                  nodeLimitPerFlow !== -1 && nodes.length >= nodeLimitPerFlow
+                    ? "#f87171"
+                    : "#9ca3af",
+                margin: 0,
+              }}
+            >
+              {nodeLimitPerFlow === -1
+                ? `Nodes: ${nodes.length} / ∞`
+                : `Nodes: ${nodes.length} / ${nodeLimitPerFlow}`}
+            </p>
+            {nodeLimitPerFlow !== -1 && nodes.length >= nodeLimitPerFlow && (
+              <p style={{ fontSize: 9, color: "#f87171", margin: "2px 0 0" }}>
+                Upgrade to add more
+              </p>
+            )}
+          </div>
+
           {(Object.keys(NODE_LABELS) as NodeType[])
             .filter((t) => t !== "start")
-            .map((type) => (
-              <button
-                key={type}
-                onClick={() => addNode(type)}
-                style={{
-                  background: "#1f1f3a",
-                  border: `1px solid ${COLORS[type].border}`,
-                  color: COLORS[type].text,
-                  borderRadius: 8,
-                  padding: "8px 10px",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  fontSize: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <span>{NODE_ICONS[type]}</span>
-                <span>{NODE_LABELS[type]}</span>
-              </button>
-            ))}
+            .map((type) => {
+              const atLimit =
+                nodeLimitPerFlow !== -1 && nodes.length >= nodeLimitPerFlow;
+              return (
+                <button
+                  key={type}
+                  onClick={() => addNode(type)}
+                  disabled={atLimit}
+                  title={atLimit ? "Node limit reached — upgrade your plan" : undefined}
+                  style={{
+                    background: atLimit ? "#111124" : "#1f1f3a",
+                    border: `1px solid ${atLimit ? "#374151" : COLORS[type].border}`,
+                    color: atLimit ? "#4b5563" : COLORS[type].text,
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    cursor: atLimit ? "not-allowed" : "pointer",
+                    textAlign: "left",
+                    fontSize: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    opacity: atLimit ? 0.5 : 1,
+                  }}
+                >
+                  <span>{NODE_ICONS[type]}</span>
+                  <span>{NODE_LABELS[type]}</span>
+                </button>
+              );
+            })}
 
           <div
             style={{
@@ -969,6 +1096,7 @@ export default function FlowBuilder({
                 node={node}
                 isSelected={selectedNode === node.id}
                 categories={categories}
+                users={users}
                 onMouseDown={onNodeMouseDown}
                 onPortMouseDown={onPortMouseDown}
                 onInputPortMouseUp={onInputPortMouseUp}
@@ -983,6 +1111,7 @@ export default function FlowBuilder({
           <NodeEditor
             node={selectedNodeData}
             categories={categories}
+            users={users}
             nodes={nodes}
             onChange={updateNode}
             onClose={() => setSelectedNode(null)}
@@ -1011,6 +1140,7 @@ interface FlowNodeProps {
   node: FlowNodeData;
   isSelected: boolean;
   categories: JobCategory[];
+  users: TeamUser[];
   onMouseDown: (e: React.MouseEvent, id: string) => void;
   onPortMouseDown: (e: React.MouseEvent, port: Port) => void;
   onInputPortMouseUp: (e: React.MouseEvent, id: string) => void;
@@ -1021,6 +1151,7 @@ function FlowNode({
   node,
   isSelected,
   categories,
+  users,
   onMouseDown,
   onPortMouseDown,
   onInputPortMouseUp,
@@ -1140,6 +1271,20 @@ function FlowNode({
             </span>
           </div>
         )}
+        {node.type === "assign_user" && (
+          <p style={{ color: "#c4b5fd", fontSize: 10, marginTop: 4 }}>
+            {node.userId
+              ? users.find((u) => u.id === node.userId)
+                  ? `${users.find((u) => u.id === node.userId)!.firstName} ${users.find((u) => u.id === node.userId)!.lastName}`
+                  : "User selected"
+              : "No user selected"}
+          </p>
+        )}
+        {node.type === "set_contact_attribute" && (
+          <p style={{ color: "#67e8f9", fontSize: 10, marginTop: 4 }}>
+            {node.field ? `${node.field} = "${node.fieldValue ?? ""}"` : "No field set"}
+          </p>
+        )}
 
         {/* Button list preview */}
         {node.type === "send_buttons" &&
@@ -1243,6 +1388,7 @@ function FlowNode({
 interface NodeEditorProps {
   node: FlowNodeData;
   categories: JobCategory[];
+  users: TeamUser[];
   nodes: FlowNodeData[];
   onChange: (patch: Partial<FlowNodeData>) => void;
   onClose: () => void;
@@ -1251,6 +1397,7 @@ interface NodeEditorProps {
 function NodeEditor({
   node,
   categories,
+  users,
   nodes,
   onChange,
   onClose,
@@ -1381,6 +1528,8 @@ function NodeEditor({
         {/* Default next */}
         {(node.type === "send_text" ||
           node.type === "assign_category" ||
+          node.type === "assign_user" ||
+          node.type === "set_contact_attribute" ||
           node.type === "start") && (
           <div>
             <label style={labelStyle}>Next Node</label>
@@ -1483,6 +1632,75 @@ function NodeEditor({
             </select>
             <p style={{ color: "#6b7280", fontSize: 10, marginTop: 4 }}>
               Assigns the contact to an employee in this category
+            </p>
+          </div>
+        )}
+
+        {/* Assign user config */}
+        {node.type === "assign_user" && (
+          <div>
+            <label style={labelStyle}>Assign to Team Member</label>
+            <select
+              value={node.userId ?? ""}
+              onChange={(e) =>
+                onChange({ userId: e.target.value || undefined })
+              }
+              style={inputStyle}
+            >
+              <option value="">— Select User —</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.firstName} {u.lastName}
+                </option>
+              ))}
+            </select>
+            <p style={{ color: "#6b7280", fontSize: 10, marginTop: 4 }}>
+              Directly assigns the conversation to a specific team member
+            </p>
+          </div>
+        )}
+
+        {/* Set contact attribute config */}
+        {node.type === "set_contact_attribute" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div>
+              <label style={labelStyle}>Field</label>
+              <select
+                value={node.field ?? "firstName"}
+                onChange={(e) => onChange({ field: e.target.value })}
+                style={inputStyle}
+              >
+                <option value="firstName">First Name</option>
+                <option value="lastName">Last Name</option>
+                <option value="email">Email</option>
+                <option value="phoneNumber">Phone Number</option>
+                <option value="__custom__">Custom Field…</option>
+              </select>
+            </div>
+            {node.field === "__custom__" && (
+              <div>
+                <label style={labelStyle}>Custom Field Key</label>
+                <input
+                  value={node.fieldValue ?? ""}
+                  onChange={(e) => onChange({ fieldValue: e.target.value })}
+                  style={inputStyle}
+                  placeholder="e.g. company_name"
+                />
+              </div>
+            )}
+            {node.field !== "__custom__" && (
+              <div>
+                <label style={labelStyle}>Value</label>
+                <input
+                  value={node.fieldValue ?? ""}
+                  onChange={(e) => onChange({ fieldValue: e.target.value })}
+                  style={inputStyle}
+                  placeholder="Value to set…"
+                />
+              </div>
+            )}
+            <p style={{ color: "#6b7280", fontSize: 10, marginTop: 2 }}>
+              Updates the contact's field with the given value during flow execution
             </p>
           </div>
         )}

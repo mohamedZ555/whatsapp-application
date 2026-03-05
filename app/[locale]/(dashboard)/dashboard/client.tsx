@@ -375,7 +375,7 @@ function AdminDashboard({
 
   const dashboardItems =
     usage?.items?.filter((item) =>
-      ["contacts", "campaignsPerMonth", "botReplies", "teamMembers"].includes(
+      ["contacts", "botReplies", "botFlowNodes", "teamMembers"].includes(
         item.key,
       ),
     ) ?? [];
