@@ -33,10 +33,21 @@ export async function middleware(request: NextRequest) {
     return intlResponse ?? NextResponse.next();
   }
 
-  const token = await getToken({
+  const isProduction = process.env.NODE_ENV === "production";
+
+  let token = await getToken({
     req: request,
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+    secureCookie: isProduction,
   });
+
+  if (!token) {
+    token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+      secureCookie: !isProduction,
+    });
+  }
 
   const isAuthenticated = !!token;
   const roleId = token?.roleId as number | undefined;
