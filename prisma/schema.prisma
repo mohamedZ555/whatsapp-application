@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model UserRole {
@@ -120,6 +121,7 @@ model Vendor {
   labels              Label[]
   manualSubscriptions ManualSubscription[]
   subscriptions       Subscription[]
+  supportTickets      SupportTicket[]
   transactions        Transaction[]
   users               User[]
   vendorSettings      VendorSetting[]
@@ -127,7 +129,6 @@ model Vendor {
   messageLogs         WhatsappMessageLog[]
   messageQueues       WhatsappMessageQueue[]
   templates           WhatsappTemplate[]
-  supportTickets      SupportTicket[]
 
   @@map("vendors")
 }
@@ -141,9 +142,9 @@ model VendorUser {
   jobCategoryId String?
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
+  jobCategory   EmployeeJobCategory? @relation(fields: [jobCategoryId], references: [id])
   user          User                 @relation(fields: [userId], references: [id])
   vendor        Vendor               @relation(fields: [vendorId], references: [id])
-  jobCategory   EmployeeJobCategory? @relation(fields: [jobCategoryId], references: [id])
 
   @@map("vendor_users")
 }
@@ -158,9 +159,9 @@ model EmployeeJobCategory {
   status      Int          @default(1)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  botFlows    BotFlow[]
   vendor      Vendor       @relation(fields: [vendorId], references: [id])
   employees   VendorUser[]
-  botFlows    BotFlow[]
 
   @@map("employee_job_categories")
 }
@@ -446,8 +447,8 @@ model BotFlow {
   data          Json?
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
-  vendor        Vendor               @relation(fields: [vendorId], references: [id])
   jobCategory   EmployeeJobCategory? @relation(fields: [jobCategoryId], references: [id])
+  vendor        Vendor               @relation(fields: [vendorId], references: [id])
   botReplies    BotReply[]
 
   @@map("bot_flows")
@@ -491,22 +492,22 @@ model ManualSubscription {
 }
 
 model Transaction {
-  id                    String    @id @default(cuid())
-  uid                   String    @unique @default(cuid())
+  id                    String   @id @default(cuid())
+  uid                   String   @unique @default(cuid())
   vendorId              String
-  type                  String    @default("subscription") // subscription | manual | refund | credit | debit
+  type                  String   @default("subscription")
   amount                Float
-  currency              String    @default("USD")
-  status                String    @default("pending") // pending | completed | failed | refunded
+  currency              String   @default("USD")
+  status                String   @default("pending")
   description           String?
   stripePaymentIntentId String?
   stripeInvoiceId       String?
   planId                String?
   billingCycle          String?
   metadata              Json?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  vendor                Vendor    @relation(fields: [vendorId], references: [id])
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  vendor                Vendor   @relation(fields: [vendorId], references: [id])
 
   @@map("transactions")
 }
@@ -567,7 +568,6 @@ model ApiToken {
   @@map("api_tokens")
 }
 
-
 model ContactMessage {
   id        String   @id @default(cuid())
   name      String
@@ -587,8 +587,8 @@ model SupportTicket {
   priority  String               @default("normal")
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
-  vendor    Vendor               @relation(fields: [vendorId], references: [id])
   replies   SupportTicketReply[]
+  vendor    Vendor               @relation(fields: [vendorId], references: [id])
 
   @@map("support_tickets")
 }
