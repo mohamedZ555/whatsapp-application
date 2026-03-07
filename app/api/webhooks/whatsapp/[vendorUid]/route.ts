@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { getPusherServer, PUSHER_EVENTS } from '@/lib/pusher';
 import { processBotAutomation } from '@/lib/bot-flow-engine';
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ven
             wabPhoneNumberId: value.metadata?.phone_number_id,
             waMessageId: msg.id,
             timestamp: msg.timestamp ? new Date(parseInt(msg.timestamp) * 1000) : null,
-            data: logData,
+            data: logData as Prisma.InputJsonValue,
           },
         });
 
