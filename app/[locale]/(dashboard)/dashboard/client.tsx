@@ -112,6 +112,8 @@ function SkeletonCard() {
 
 function RecentMessagesList({ messages }: { messages?: any[] }) {
   const t = useTranslations("dashboard");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
 
   if (!messages || messages.length === 0) {
     return (
@@ -122,38 +124,240 @@ function RecentMessagesList({ messages }: { messages?: any[] }) {
     );
   }
 
+  const totalPages = Math.ceil(messages.length / itemsPerPage);
+  const startIdx = (currentPage - 1) * itemsPerPage;
+  const currentMessages = messages.slice(startIdx, startIdx + itemsPerPage);
+
   return (
-    <div className="divide-y divide-gray-50">
-      {messages.map((msg: any) => (
-        <div
-          key={msg.id}
-          className="px-6 py-3 flex items-center gap-3 hover:bg-gray-50/50 transition-colors"
-        >
-          <div className="w-9 h-9 bg-emerald-100 rounded-full flex items-center justify-center text-xs text-emerald-700 font-bold flex-shrink-0">
-            {msg.contact?.firstName?.[0]?.toUpperCase() ?? "#"}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">
-              {msg.contact?.firstName} {msg.contact?.lastName}
-              <span className="text-gray-400 font-normal ml-1">
-                ({msg.contact?.waId})
-              </span>
-            </p>
-            <p className="text-xs text-gray-500 truncate">
-              {msg.messageContent ?? `[${msg.messageType}]`}
-            </p>
-          </div>
-          <span
-            className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${
-              msg.isIncomingMessage
-                ? "bg-blue-50 text-blue-600"
-                : "bg-emerald-50 text-emerald-600"
-            }`}
+    <div className="flex flex-col">
+      <div className="divide-y divide-gray-50 flex-1">
+        {currentMessages.map((msg: any) => (
+          <div
+            key={msg.id}
+            className="px-6 py-3 flex items-center gap-3 hover:bg-gray-50/50 transition-colors"
           >
-            {msg.isIncomingMessage ? "↓" : "↑"} {msg.status}
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${msg.isIncomingMessage ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"}`}
+            >
+              {msg.contact?.firstName?.[0]?.toUpperCase() ?? "#"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate flex items-center gap-1.5">
+                {msg.contact?.firstName} {msg.contact?.lastName}
+                <span className="text-gray-400 font-normal text-xs">
+                  ({msg.contact?.waId})
+                </span>
+              </p>
+              <p className="text-xs text-gray-500 truncate mt-0.5">
+                {msg.messageContent ?? `[${msg.messageType}]`}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide ${
+                  msg.isIncomingMessage
+                    ? "bg-blue-50 text-blue-600"
+                    : msg.status === "failed"
+                      ? "bg-rose-50 text-rose-600"
+                      : "bg-emerald-50 text-emerald-600"
+                }`}
+              >
+                {msg.isIncomingMessage ? "↓ IN" : "↑ " + msg.status}
+              </span>
+              <span className="text-[10px] text-gray-400 font-medium">
+                {new Date(msg.createdAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50/30 rounded-b-2xl">
+          <span className="text-xs text-gray-500 font-medium">
+            Showing {startIdx + 1}-
+            {Math.min(startIdx + itemsPerPage, messages.length)} of{" "}
+            {messages.length}
           </span>
+          <div className="flex gap-1.5">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+              className="px-2.5 py-1 text-xs font-medium bg-white border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              Prev
+            </button>
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+              className="px-2.5 py-1 text-xs font-medium bg-white border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              Next
+            </button>
+          </div>
         </div>
-      ))}
+      )}
+    </div>
+  );
+}
+
+// ─── Shared: Delivery Stats ───────────────────────────────────────────────────
+
+function MessageDeliveryStats({
+  stats,
+  isSuperAdmin,
+}: {
+  stats: Stats | null;
+  isSuperAdmin?: boolean;
+}) {
+  const t = useTranslations("dashboard");
+
+  if (!stats?.deliveryStats || stats.deliveryStats.length === 0) return null;
+
+  const deliveryMap: Record<string, number> = {};
+  stats.deliveryStats.forEach((d: any) => {
+    deliveryMap[d.status] = d._count;
+  });
+
+  const totalOutbound = Object.values(deliveryMap).reduce(
+    (acc, curr) => acc + curr,
+    0,
+  );
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-6">
+      <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+        <div>
+          <h2 className="font-semibold text-gray-900">
+            {isSuperAdmin
+              ? t("platformMessageDelivery")
+              : t("localMessageDelivery")}
+          </h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {isSuperAdmin
+              ? t("acrossAllWorkspaces")
+              : t("localMessageDeliveryDesc")}
+          </p>
+        </div>
+        <div className="px-3 py-1 bg-slate-50 border border-slate-100 rounded-lg text-center">
+          <p className="text-xs text-slate-500 font-medium">Total Tracked</p>
+          <p className="text-sm font-bold text-slate-800 tabular-nums">
+            {totalOutbound}
+          </p>
+        </div>
+      </div>
+      <div className="px-6 py-5 grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {["sent", "delivered", "read", "failed"].map((status) => {
+          const count = deliveryMap[status] || 0;
+          const percent =
+            totalOutbound > 0 ? Math.round((count / totalOutbound) * 100) : 0;
+
+          let colorClass = "bg-slate-400",
+            bgLighter = "bg-slate-50";
+          if (status === "sent") {
+            colorClass = "bg-blue-400";
+            bgLighter = "bg-blue-50";
+          }
+          if (status === "delivered") {
+            colorClass = "bg-emerald-400";
+            bgLighter = "bg-emerald-50";
+          }
+          if (status === "read") {
+            colorClass = "bg-purple-400";
+            bgLighter = "bg-purple-50";
+          }
+          if (status === "failed") {
+            colorClass = "bg-rose-400";
+            bgLighter = "bg-rose-50";
+          }
+
+          return (
+            <div
+              key={status}
+              className={`p-4 rounded-xl border border-gray-100 flex flex-col items-center justify-center relative overflow-hidden group`}
+            >
+              <div
+                className={`absolute bottom-0 left-0 h-1 transition-all duration-700 ${colorClass}`}
+                style={{ width: `${percent}%` }}
+              />
+              <div
+                className={`absolute -right-6 -top-6 w-20 h-20 rounded-full opacity-0 group-hover:opacity-10 transition-opacity ${bgLighter} ${colorClass.replace("bg-", "bg-")}`}
+              />
+              <div className="mb-1 text-2xl font-bold text-gray-900 tabular-nums z-10">
+                {count}
+              </div>
+              <div className="flex items-center gap-1.5 z-10">
+                <span className={`w-1.5 h-1.5 rounded-full ${colorClass}`} />
+                <span className="text-xs font-semibold text-gray-500 capitalize">
+                  {t(status as any, { default: status })}
+                </span>
+              </div>
+              <div className="mt-2 text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 z-10">
+                {percent}%
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Admin/Employee Quick Actions ──────────────────────────────────────────────
+
+function ActionQuickLinks() {
+  const t = useTranslations("dashboard");
+  const tn = useTranslations("nav");
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <h2 className="font-semibold text-gray-900 mb-4">{t("quickActions")}</h2>
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/campaigns"
+          className="px-4 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-sm font-semibold hover:bg-emerald-100 transition border border-emerald-100/50 flex items-center gap-2"
+        >
+          {t("createCampaign")}
+        </Link>
+        <Link
+          href="/contacts"
+          className="px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-semibold hover:bg-blue-100 transition border border-blue-100/50 flex items-center gap-2"
+        >
+          {t("addContact")}
+        </Link>
+        <Link
+          href="/bot-replies"
+          className="px-4 py-2.5 bg-purple-50 text-purple-700 rounded-xl text-sm font-semibold hover:bg-purple-100 transition border border-purple-100/50 flex items-center gap-2"
+        >
+          {t("setupBot")}
+        </Link>
+        <Link
+          href="/templates"
+          className="px-4 py-2.5 bg-amber-50 text-amber-700 rounded-xl text-sm font-semibold hover:bg-amber-100 transition border border-amber-100/50 flex items-center gap-2"
+        >
+          {t("syncTemplates")}
+        </Link>
+        <Link
+          href="/users"
+          className="px-4 py-2.5 bg-indigo-50 text-indigo-700 rounded-xl text-sm font-semibold hover:bg-indigo-100 transition border border-indigo-100/50 flex items-center gap-2"
+        >
+          {t("manageTeam")}
+        </Link>
+        <Link
+          href="/chat"
+          className="px-4 py-2.5 bg-cyan-50 text-cyan-700 rounded-xl text-sm font-semibold hover:bg-cyan-100 transition border border-cyan-100/50 flex items-center gap-2"
+        >
+          {t("chatInbox")}
+        </Link>
+        <Link
+          href="/settings"
+          className="px-4 py-2.5 bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-100 transition border border-slate-100/50 flex items-center gap-2"
+        >
+          {tn("settings")}
+        </Link>
+      </div>
     </div>
   );
 }
@@ -249,44 +453,7 @@ function SuperAdminDashboard({
         </Link>
       )}
 
-      {stats?.deliveryStats && stats.deliveryStats.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="font-semibold text-gray-900">
-              {t("platformMessageDelivery")}
-            </h2>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {t("acrossAllWorkspaces")}
-            </p>
-          </div>
-          <div className="px-6 py-4 flex flex-wrap gap-4">
-            {Object.entries(deliveryMap).map(([status, count]) => (
-              <div
-                key={status}
-                className="flex items-center gap-2 bg-gray-50 rounded-lg px-4 py-2.5"
-              >
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    status === "sent"
-                      ? "bg-blue-400"
-                      : status === "delivered"
-                        ? "bg-emerald-400"
-                        : status === "read"
-                          ? "bg-purple-400"
-                          : "bg-rose-400"
-                  }`}
-                />
-                <span className="text-xs font-medium text-gray-600 capitalize">
-                  {status}
-                </span>
-                <span className="text-sm font-bold text-gray-900 tabular-nums">
-                  {count}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <MessageDeliveryStats stats={stats} isSuperAdmin />
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -388,6 +555,8 @@ function AdminDashboard({
         ))}
       </div>
 
+      <ActionQuickLinks />
+
       {usage && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -461,6 +630,8 @@ function AdminDashboard({
         </div>
       )}
 
+      <MessageDeliveryStats stats={stats} />
+
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="font-semibold text-gray-900">{t("recentMessages")}</h2>
@@ -533,6 +704,10 @@ function EmployeeDashboard({
           <StatCard key={c.label} {...c} />
         ))}
       </div>
+
+      <ActionQuickLinks />
+
+      <MessageDeliveryStats stats={stats} />
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">

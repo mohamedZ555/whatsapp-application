@@ -39,6 +39,7 @@ type UserFormState = {
   vendorId: string;
   vendorTitle: string;
   permissions: string[];
+  jobCategoryId: string;
 };
 
 type UserEditState = {
@@ -53,6 +54,7 @@ type UserEditState = {
   vendorId: string;
   permissions: string[];
   password: string;
+  jobCategoryId: string;
   // Extra for UI context:
   adminName?: string;
   adminPermissions?: string[]; // undefined = no restriction (super admin editing admin), [] = admin has none
@@ -404,15 +406,21 @@ function CreateModal({
     vendorId: sessionVendorId ?? "",
     vendorTitle: "",
     permissions: ["manage_chat"],
+    jobCategoryId: "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [createPlanPerms, setCreatePlanPerms] = useState<string[]>([]);
+  const [jobCategories, setJobCategories] = useState<
+    { id: string; name: string }[]
+  >([]);
 
-  // Fetch plan-disabled perms when vendor selection changes (super admin creating employee for specific vendor)
+  // Fetch plan-disabled perms and job categories when vendor selection changes
   useEffect(() => {
     const targetVendorId = form.vendorId || sessionVendorId;
     if (!targetVendorId) return;
+
+    // Fetch plan permissions
     fetch(
       `/api/subscription/plan-perms?vendorId=${encodeURIComponent(targetVendorId)}`,
     )
@@ -423,6 +431,14 @@ function CreateModal({
         ),
       )
       .catch(() => setCreatePlanPerms([]));
+
+    // Fetch job categories
+    fetch(`/api/job-categories?vendorId=${encodeURIComponent(targetVendorId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        setJobCategories(Array.isArray(d?.categories) ? d.categories : []);
+      })
+      .catch(() => setJobCategories([]));
   }, [form.vendorId, sessionVendorId]);
 
   function set<K extends keyof UserFormState>(key: K, value: UserFormState[K]) {
@@ -583,6 +599,22 @@ function CreateModal({
               </select>
             </FieldGroup>
           )}
+          {isEmployee && jobCategories.length > 0 && (
+            <FieldGroup label={t("jobCategory", { default: "Job Category" })}>
+              <select
+                value={form.jobCategoryId}
+                onChange={(e) => set("jobCategoryId", e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{tc("none", { default: "None" })}</option>
+                {jobCategories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </FieldGroup>
+          )}
           {(isEmployee || isAdminRole) && (
             <div className="md:col-span-2">
               <label className="mb-2 block text-sm font-semibold text-slate-700">
@@ -655,6 +687,21 @@ function EditModal({
   const [error, setError] = useState("");
   const [permWarn, setPermWarn] = useState(""); // out-of-scope warning from API
   const [outOfScope, setOutOfScope] = useState<string[]>([]);
+  const [jobCategories, setJobCategories] = useState<
+    { id: string; name: string }[]
+  >([]);
+
+  useEffect(() => {
+    if (!initial.vendorId) return;
+    fetch(
+      `/api/job-categories?vendorId=${encodeURIComponent(initial.vendorId)}`,
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        setJobCategories(Array.isArray(d?.categories) ? d.categories : []);
+      })
+      .catch(() => setJobCategories([]));
+  }, [initial.vendorId]);
 
   function set<K extends keyof UserEditState>(key: K, value: UserEditState[K]) {
     setForm((s) => ({ ...s, [key]: value }));
@@ -681,6 +728,7 @@ function EditModal({
       mobileNumber: form.mobileNumber,
       status: form.status,
       permissions: form.permissions,
+      jobCategoryId: form.jobCategoryId,
     };
     if (form.password.trim()) payload.password = form.password;
 
@@ -886,6 +934,22 @@ function EditModal({
                 {statusOptions.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
+                  </option>
+                ))}
+              </select>
+            </FieldGroup>
+          )}
+          {isEmployee && jobCategories.length > 0 && (
+            <FieldGroup label={t("jobCategory", { default: "Job Category" })}>
+              <select
+                value={form.jobCategoryId}
+                onChange={(e) => set("jobCategoryId", e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{tc("none", { default: "None" })}</option>
+                {jobCategories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
                   </option>
                 ))}
               </select>
@@ -1108,6 +1172,7 @@ export default function UsersPage() {
       vendorId: targetVendorId,
       permissions: row.vendorUserDetail?.permissions ?? [],
       password: "",
+      jobCategoryId: row.vendorUserDetail?.jobCategory?.id ?? "",
       adminPermissions,
       adminName,
       planDisabledPerms,

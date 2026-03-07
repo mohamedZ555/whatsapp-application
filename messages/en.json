@@ -68,7 +68,16 @@
     "activeSubscriptions": "Active Subscriptions",
     "platformMessageDelivery": "Platform Message Delivery",
     "acrossAllWorkspaces": "Across all vendor workspaces",
+    "localMessageDelivery": "Message Delivery",
+    "localMessageDeliveryDesc": "Overview of message statuses",
     "latestAcrossWorkspaces": "Latest across all workspaces",
+    "quickActions": "Quick Actions",
+    "createCampaign": "Create Campaign",
+    "addContact": "Add Contact",
+    "setupBot": "Setup Bot",
+    "manageTeam": "Manage Team",
+    "syncTemplates": "Sync Templates",
+    "chatInbox": "Chat Inbox",
     "viewAll": "View all",
     "managePlan": "Manage plan",
     "planUsage": "Plan Usage",
@@ -387,7 +396,8 @@
     "permConflictHint": "Please deselect the highlighted permissions above, or update the admin's permissions first.",
     "failedUpdateUser": "Failed to update user.",
     "leaveBlankPassword": "leave blank to keep",
-    "removingAdminPermsWarning": "Removing permissions from this admin will automatically revoke those permissions from all their employees."
+    "removingAdminPermsWarning": "Removing permissions from this admin will automatically revoke those permissions from all their employees.",
+    "jobCategory": "Job Category"
   },
   "subscription": {
     "title": "Subscription",

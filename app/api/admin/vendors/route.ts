@@ -1,29 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import prisma from '@/lib/prisma';
-import { getActorFromSession, isSuperAdmin } from '@/lib/rbac';
-import bcrypt from 'bcryptjs';
-import { USER_ROLES } from '@/lib/constants';
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import prisma from "@/lib/prisma";
+import { getActorFromSession, isSuperAdmin } from "@/lib/rbac";
+import bcrypt from "bcryptjs";
+import { USER_ROLES } from "@/lib/constants";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const actor = getActorFromSession(session);
   if (!actor || !isSuperAdmin(actor)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);
-  const search = searchParams.get('search')?.trim() ?? '';
-  const page = Math.max(1, Number(searchParams.get('page') ?? 1));
-  const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit') ?? 25)));
+  const search = searchParams.get("search")?.trim() ?? "";
+  const page = Math.max(1, Number(searchParams.get("page") ?? 1));
+  const limit = Math.min(
+    100,
+    Math.max(1, Number(searchParams.get("limit") ?? 25)),
+  );
 
   const where = search
     ? {
         OR: [
-          { title: { contains: search, mode: 'insensitive' as const } },
-          { slug: { contains: search, mode: 'insensitive' as const } },
-          { uid: { contains: search, mode: 'insensitive' as const } },
+          { title: { contains: search, mode: "insensitive" as const } },
+          { slug: { contains: search, mode: "insensitive" as const } },
+          { uid: { contains: search, mode: "insensitive" as const } },
         ],
       }
     : {};
@@ -33,14 +36,25 @@ export async function GET(req: NextRequest) {
       where,
       skip: (page - 1) * limit,
       take: limit,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         users: {
           where: { roleId: 2 },
           take: 1,
-          select: { id: true, firstName: true, lastName: true, email: true, username: true, status: true },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            username: true,
+            status: true,
+          },
         },
-        subscriptions: { where: { status: 'active' }, take: 1, orderBy: { createdAt: 'desc' } },
+        subscriptions: {
+          where: { status: "active" },
+          take: 1,
+          orderBy: { createdAt: "desc" },
+        },
       },
     }),
     prisma.vendor.count({ where }),
@@ -53,36 +67,74 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const actor = getActorFromSession(session);
   if (!actor || !isSuperAdmin(actor)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await req.json();
-  const title = typeof body.title === 'string' ? body.title.trim() : '';
-  const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
-  const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : '';
-  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-  const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : '';
-  const password = typeof body.password === 'string' ? body.password : '';
-  const mobileNumber = typeof body.mobileNumber === 'string' ? body.mobileNumber.trim() : null;
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const firstName =
+    typeof body.firstName === "string" ? body.firstName.trim() : "";
+  const lastName =
+    typeof body.lastName === "string" ? body.lastName.trim() : "";
+  const email =
+    typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  const username =
+    typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
+  const password = typeof body.password === "string" ? body.password : "";
+  const mobileNumber =
+    typeof body.mobileNumber === "string" ? body.mobileNumber.trim() : null;
 
-  if (!title) return NextResponse.json({ error: 'Vendor title is required.' }, { status: 400 });
-  if (!firstName) return NextResponse.json({ error: 'First name is required.' }, { status: 400 });
-  if (!email) return NextResponse.json({ error: 'Email is required.' }, { status: 400 });
-  if (!username) return NextResponse.json({ error: 'Username is required.' }, { status: 400 });
-  if (password.length < 6) return NextResponse.json({ error: 'Password must be at least 6 characters.' }, { status: 400 });
+  if (!title)
+    return NextResponse.json(
+      { error: "Vendor title is required." },
+      { status: 400 },
+    );
+  if (!firstName)
+    return NextResponse.json(
+      { error: "First name is required." },
+      { status: 400 },
+    );
+  if (!email)
+    return NextResponse.json({ error: "Email is required." }, { status: 400 });
+  if (!username)
+    return NextResponse.json(
+      { error: "Username is required." },
+      { status: 400 },
+    );
+  if (password.length < 6)
+    return NextResponse.json(
+      { error: "Password must be at least 6 characters." },
+      { status: 400 },
+    );
 
   // Check uniqueness
   const [existingEmail, existingUsername] = await Promise.all([
     prisma.user.findUnique({ where: { email }, select: { id: true } }),
     prisma.user.findUnique({ where: { username }, select: { id: true } }),
   ]);
-  if (existingEmail) return NextResponse.json({ error: 'Email already in use.' }, { status: 400 });
-  if (existingUsername) return NextResponse.json({ error: 'Username already in use.' }, { status: 400 });
+  if (existingEmail)
+    return NextResponse.json(
+      { error: "Email already in use." },
+      { status: 400 },
+    );
+  if (existingUsername)
+    return NextResponse.json(
+      { error: "Username already in use." },
+      { status: 400 },
+    );
 
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
   // Ensure slug uniqueness by appending a random suffix if needed
-  const slugExists = await prisma.vendor.findUnique({ where: { slug }, select: { id: true } });
-  const finalSlug = slugExists ? `${slug}-${Math.random().toString(36).slice(2, 7)}` : slug;
+  const slugExists = await prisma.vendor.findUnique({
+    where: { slug },
+    select: { id: true },
+  });
+  const finalSlug = slugExists
+    ? `${slug}-${Math.random().toString(36).slice(2, 7)}`
+    : slug;
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -94,7 +146,7 @@ export async function POST(req: NextRequest) {
       users: {
         create: {
           firstName,
-          lastName: lastName || '',
+          lastName: lastName || "",
           email,
           username,
           password: hashedPassword,
@@ -113,21 +165,26 @@ export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const actor = getActorFromSession(session);
   if (!actor || !isSuperAdmin(actor)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await req.json();
-  const id = typeof body.id === 'string' ? body.id : null;
-  if (!id) return NextResponse.json({ error: 'id is required.' }, { status: 400 });
+  const id = typeof body.id === "string" ? body.id : null;
+  if (!id)
+    return NextResponse.json({ error: "id is required." }, { status: 400 });
 
-  const existing = await prisma.vendor.findUnique({ where: { id }, select: { id: true } });
-  if (!existing) return NextResponse.json({ error: 'Vendor not found.' }, { status: 404 });
+  const existing = await prisma.vendor.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!existing)
+    return NextResponse.json({ error: "Vendor not found." }, { status: 404 });
 
   const updated = await prisma.vendor.update({
     where: { id },
     data: {
       title: body.title !== undefined ? String(body.title) : undefined,
-      status: typeof body.status === 'number' ? body.status : undefined,
+      status: typeof body.status === "number" ? body.status : undefined,
     },
   });
 
@@ -138,38 +195,58 @@ export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const actor = getActorFromSession(session);
   if (!actor || !isSuperAdmin(actor)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await req.json();
-  const vendorId = typeof body.vendorId === 'string' ? body.vendorId : null;
-  const action = typeof body.action === 'string' ? body.action : null;
+  const vendorId = typeof body.vendorId === "string" ? body.vendorId : null;
+  const action = typeof body.action === "string" ? body.action : null;
 
-  if (!vendorId) return NextResponse.json({ error: 'vendorId is required.' }, { status: 400 });
-  if (!action || !['approve', 'ban', 'unban'].includes(action)) {
-    return NextResponse.json({ error: 'action must be approve, ban, or unban.' }, { status: 400 });
+  if (!vendorId)
+    return NextResponse.json(
+      { error: "vendorId is required." },
+      { status: 400 },
+    );
+  if (!action || !["approve", "ban", "unban"].includes(action)) {
+    return NextResponse.json(
+      { error: "action must be approve, ban, or unban." },
+      { status: 400 },
+    );
   }
 
-  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { id: true } });
-  if (!vendor) return NextResponse.json({ error: 'Vendor not found.' }, { status: 404 });
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: { id: true },
+  });
+  if (!vendor)
+    return NextResponse.json({ error: "Vendor not found." }, { status: 404 });
 
-  if (action === 'approve') {
+  if (action === "approve") {
     // Activate vendor and their admin user
-    await prisma.vendor.update({ where: { id: vendorId }, data: { status: 1 } });
+    await prisma.vendor.update({
+      where: { id: vendorId },
+      data: { status: 1 },
+    });
     await prisma.user.updateMany({
       where: { vendorId, roleId: 2, status: { in: [2, 3, 4] } },
       data: { status: 1 },
     });
-  } else if (action === 'ban') {
+  } else if (action === "ban") {
     // Ban vendor and block all their users
-    await prisma.vendor.update({ where: { id: vendorId }, data: { status: 3 } });
+    await prisma.vendor.update({
+      where: { id: vendorId },
+      data: { status: 3 },
+    });
     await prisma.user.updateMany({
       where: { vendorId, status: { not: 5 } },
       data: { status: 6 },
     });
-  } else if (action === 'unban') {
+  } else if (action === "unban") {
     // Restore vendor to active
-    await prisma.vendor.update({ where: { id: vendorId }, data: { status: 1 } });
+    await prisma.vendor.update({
+      where: { id: vendorId },
+      data: { status: 1 },
+    });
     await prisma.user.updateMany({
       where: { vendorId, status: 6 },
       data: { status: 1 },
@@ -183,20 +260,30 @@ export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const actor = getActorFromSession(session);
   if (!actor || !isSuperAdmin(actor)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);
-  const id = searchParams.get('id');
-  if (!id) return NextResponse.json({ error: 'id is required.' }, { status: 400 });
+  const id = searchParams.get("id");
+  if (!id)
+    return NextResponse.json({ error: "id is required." }, { status: 400 });
 
-  const existing = await prisma.vendor.findUnique({ where: { id }, select: { id: true } });
-  if (!existing) return NextResponse.json({ error: 'Vendor not found.' }, { status: 404 });
+  const existing = await prisma.vendor.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!existing)
+    return NextResponse.json({ error: "Vendor not found." }, { status: 404 });
 
   // Soft delete: set status to 0
   await prisma.vendor.update({
     where: { id },
     data: { status: 0 },
+  });
+
+  await prisma.user.updateMany({
+    where: { vendorId: id, status: { not: 5 } },
+    data: { status: 5 },
   });
 
   return NextResponse.json({ success: true });

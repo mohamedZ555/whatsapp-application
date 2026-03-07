@@ -403,6 +403,43 @@ export async function PUT(req: NextRequest) {
     },
   });
 
+  if (
+    target.roleId === USER_ROLES.VENDOR &&
+    target.vendorId &&
+    parsedStatus !== undefined &&
+    parsedStatus !== target.status
+  ) {
+    if (parsedStatus === 6 || parsedStatus === 3) {
+      // Ban or Suspend
+      await prisma.vendor.update({
+        where: { id: target.vendorId },
+        data: { status: 3 },
+      });
+      await prisma.user.updateMany({
+        where: {
+          vendorId: target.vendorId,
+          id: { not: target.id },
+          status: { not: 5 },
+        },
+        data: { status: parsedStatus === 6 ? 6 : 3 },
+      });
+    } else if (parsedStatus === 1) {
+      // Unban or Actuate
+      await prisma.vendor.update({
+        where: { id: target.vendorId },
+        data: { status: 1 },
+      });
+      await prisma.user.updateMany({
+        where: {
+          vendorId: target.vendorId,
+          id: { not: target.id },
+          status: { in: [6, 3] },
+        },
+        data: { status: 1 },
+      });
+    }
+  }
+
   const permissions = normalizePermissions(body?.permissions);
   const jobCategoryIdRaw = body?.jobCategoryId;
   const jobCategoryId =
@@ -556,6 +593,26 @@ export async function DELETE(req: NextRequest) {
     data: { status: 5 },
   });
   await prisma.vendorUser.deleteMany({ where: { userId: target.id } });
+
+  if (target.roleId === USER_ROLES.VENDOR && target.vendorId) {
+    // Soft delete the vendor workspace
+    await prisma.vendor.update({
+      where: { id: target.vendorId },
+      data: { status: 0 },
+    });
+    // Soft delete all employees under this vendor
+    await prisma.user.updateMany({
+      where: {
+        vendorId: target.vendorId,
+        id: { not: target.id },
+        status: { not: 5 },
+      },
+      data: { status: 5 },
+    });
+    await prisma.vendorUser.deleteMany({
+      where: { vendorId: target.vendorId },
+    });
+  }
 
   return NextResponse.json({ success: true });
 }

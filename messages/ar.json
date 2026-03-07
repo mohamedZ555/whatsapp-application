@@ -68,7 +68,16 @@
     "activeSubscriptions": "الاشتراكات النشطة",
     "platformMessageDelivery": "تسليم رسائل المنصة",
     "acrossAllWorkspaces": "في جميع مساحات العمل",
+    "localMessageDelivery": "تسليم الرسائل",
+    "localMessageDeliveryDesc": "نظرة عامة على حالات الرسائل",
     "latestAcrossWorkspaces": "الأحدث في جميع مساحات العمل",
+    "quickActions": "إجراءات سريعة",
+    "createCampaign": "إنشاء حملة",
+    "addContact": "إضافة جهة اتصال",
+    "setupBot": "إعداد الروبوت",
+    "manageTeam": "إدارة الفريق",
+    "syncTemplates": "مزامنة النماذج",
+    "chatInbox": "صندوق الدردشة",
     "viewAll": "عرض الكل",
     "managePlan": "إدارة الخطة",
     "planUsage": "استخدام الخطة",
@@ -387,7 +396,8 @@
     "permConflictHint": "يرجى إلغاء تحديد الصلاحيات المظللة أعلاه، أو تحديث صلاحيات المشرف أولاً.",
     "failedUpdateUser": "فشل تحديث المستخدم.",
     "leaveBlankPassword": "اترك فارغًا للإبقاء",
-    "removingAdminPermsWarning": "إزالة الصلاحيات من هذا المشرف سيلغي تلقائيًا تلك الصلاحيات من جميع موظفيه."
+    "removingAdminPermsWarning": "إزالة الصلاحيات من هذا المشرف سيلغي تلقائيًا تلك الصلاحيات من جميع موظفيه.",
+    "jobCategory": "الفئة الوظيفية"
   },
   "subscription": {
     "title": "الاشتراك",

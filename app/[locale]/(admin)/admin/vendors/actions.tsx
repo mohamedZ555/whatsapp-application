@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 
 type VendorActionsCellProps = {
   vendor: {
@@ -143,6 +143,7 @@ export function VendorActionsCell({
 }: VendorActionsCellProps) {
   const tAdmin = useTranslations("admin");
   const tCommon = useTranslations("common");
+  const locale = useLocale();
 
   const [modal, setModal] = useState<ModalState>("none");
   const [loading, setLoading] = useState(false);
@@ -230,7 +231,7 @@ export function VendorActionsCell({
         body: JSON.stringify({ vendorId: vendor.id }),
       });
       const data = await res.json();
-      if (data.success) window.location.href = "/dashboard";
+      if (data.success) window.location.href = `/${locale}/dashboard`;
       else alert(data.error ?? tCommon("error"));
     } catch {
       alert(tCommon("error"));
@@ -264,8 +265,13 @@ export function VendorActionsCell({
     }
   }
 
-  async function handleSoftDelete() {
-    if (!window.confirm(tAdmin("confirmSoftDelete"))) return;
+  async function handleDelete() {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this vendor? This will deactivate their account and delete all associated users.",
+      )
+    )
+      return;
     setLoading(true);
     try {
       const res = await fetch(
@@ -1247,11 +1253,11 @@ export function VendorActionsCell({
             </button>
           )}
           <button
-            onClick={handleSoftDelete}
+            onClick={handleDelete}
             disabled={loading}
             className="rounded bg-rose-700 px-2 py-1 text-[11px] font-semibold text-white hover:bg-rose-800 disabled:opacity-50"
           >
-            {tAdmin("softDelete")}
+            {tCommon("delete")}
           </button>
           <button
             onClick={() => {

@@ -1,31 +1,35 @@
-'use client';
+"use client";
 
-import { useSession } from 'next-auth/react';
-import { useTranslations } from 'next-intl';
-import { Link } from '@/i18n/navigation';
-import { canAccessVendorPath } from '@/lib/access';
-import { cn } from '@/lib/utils';
-
-type SettingsTabKey = 'general' | 'whatsapp' | 'profile' | 'jobCategories';
-
+import { useSession } from "next-auth/react";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
+import { canAccessVendorPath } from "@/lib/access";
+import { cn } from "@/lib/utils";
+type SettingsTabKey = "general" | "whatsapp" | "jobCategories";
 type SettingsTabsProps = {
   activeTab: SettingsTabKey;
   className?: string;
 };
 
-export default function SettingsTabs({ activeTab, className }: SettingsTabsProps) {
-  const t = useTranslations('settings');
+export default function SettingsTabs({
+  activeTab,
+  className,
+}: SettingsTabsProps) {
+  const t = useTranslations("settings");
   const { data: session } = useSession();
 
   const roleId = (session?.user as { roleId?: number } | undefined)?.roleId;
-  const permissions = (session?.user as { permissions?: string[] } | undefined)?.permissions;
+  const permissions = (session?.user as { permissions?: string[] } | undefined)
+    ?.permissions;
   const permissionsRestricted =
-    (session?.user as { permissionsRestricted?: boolean } | undefined)?.permissionsRestricted ?? false;
+    (session?.user as { permissionsRestricted?: boolean } | undefined)
+      ?.permissionsRestricted ?? false;
   const planDisabledPerms =
-    (session?.user as { planDisabledPerms?: string[] } | undefined)?.planDisabledPerms ?? [];
+    (session?.user as { planDisabledPerms?: string[] } | undefined)
+      ?.planDisabledPerms ?? [];
 
   const canAccessJobCategories = canAccessVendorPath(
-    '/settings/job-categories',
+    "/settings/job-categories",
     roleId,
     permissions,
     planDisabledPerms,
@@ -33,17 +37,20 @@ export default function SettingsTabs({ activeTab, className }: SettingsTabsProps
   );
 
   const tabs: Array<{ key: SettingsTabKey; href: string; label: string }> = [
-    { key: 'general', href: '/settings', label: t('general') },
-    { key: 'whatsapp', href: '/settings/whatsapp', label: t('whatsapp') },
-    { key: 'profile', href: '/settings/profile', label: t('profile') },
+    { key: "general", href: "/settings", label: t("general") },
+    { key: "whatsapp", href: "/settings/whatsapp", label: t("whatsapp") },
   ];
 
   if (canAccessJobCategories) {
-    tabs.push({ key: 'jobCategories', href: '/settings/job-categories', label: t('jobCategories') });
+    tabs.push({
+      key: "jobCategories",
+      href: "/settings/job-categories",
+      label: t("jobCategories"),
+    });
   }
 
   return (
-    <div className={cn('flex gap-1 border-b border-gray-200', className)}>
+    <div className={cn("flex gap-1 border-b border-gray-200", className)}>
       {tabs.map((tab) => {
         const isActive = tab.key === activeTab;
 
