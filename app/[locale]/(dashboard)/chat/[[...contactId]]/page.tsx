@@ -271,25 +271,31 @@ function TemplateModal({
 }
 
 /* ─── Media Preview ── */
-function MediaPreview({ msg }: { msg: any }) {
+function MediaPreview({ msg, contactId }: { msg: any; contactId: string | null }) {
   const t = useTranslations("chat");
   const mediaData = (msg.data as any) ?? {};
   const type = msg.messageType as string;
+  const mediaId = mediaData.mediaId ?? null;
   const url = mediaData.mediaUrl ?? mediaData.media_values?.url ?? null;
+  const proxyUrl =
+    mediaId && contactId
+      ? `/api/chat/media?mediaId=${encodeURIComponent(mediaId)}&contactId=${encodeURIComponent(contactId)}`
+      : null;
+  const displayUrl = url || proxyUrl;
   const fileName = mediaData.fileName ?? null;
   const caption = msg.messageContent;
   const isOut = !msg.isIncomingMessage;
 
   if (type === "image") {
-    if (url) {
+    if (displayUrl) {
       return (
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={url}
+            src={displayUrl}
             alt="image"
-            className="rounded-lg max-w-[200px] max-h-48 object-cover cursor-pointer"
-            onClick={() => window.open(url, "_blank")}
+            className="rounded-lg max-w-[280px] max-h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity"
+            onClick={() => window.open(displayUrl, "_blank")}
           />
           {caption && <p className="text-xs mt-1 opacity-80">{caption}</p>}
         </div>
@@ -304,13 +310,14 @@ function MediaPreview({ msg }: { msg: any }) {
   }
 
   if (type === "video") {
-    if (url) {
+    if (displayUrl) {
       return (
         <div>
           <video
-            src={url}
+            src={displayUrl}
             controls
-            className="rounded-lg max-w-[220px] max-h-48"
+            className="rounded-lg max-w-[280px] max-h-64"
+            preload="metadata"
           />
           {caption && <p className="text-xs mt-1 opacity-80">{caption}</p>}
         </div>
@@ -325,10 +332,21 @@ function MediaPreview({ msg }: { msg: any }) {
   }
 
   if (type === "audio") {
-    if (url) {
-      return <audio src={url} controls className="max-w-[220px]" />;
+    if (displayUrl) {
+      return (
+        <div className="flex items-center gap-2 rounded-xl bg-white/10 px-2 py-1.5">
+          <audio src={displayUrl} controls className="max-w-full min-w-[200px] h-9" />
+        </div>
+      );
     }
-    // Audio sent via mediaId — no direct URL available from our DB, show placeholder
+    if (proxyUrl) {
+      return (
+        <div className="flex items-center gap-2 rounded-xl bg-white/10 px-2 py-1.5">
+          <audio src={proxyUrl} controls className="max-w-full min-w-[200px] h-9" />
+          {fileName && <span className="text-[10px] opacity-75 truncate">{fileName}</span>}
+        </div>
+      );
+    }
     return (
       <div
         className={`flex items-center gap-2.5 rounded-xl px-3 py-2 ${
@@ -368,19 +386,19 @@ function MediaPreview({ msg }: { msg: any }) {
           : ext === "PPT" || ext === "PPTX"
             ? "📙"
             : "📄";
-    if (url) {
+    if (displayUrl) {
       return (
         <a
-          href={url}
+          href={displayUrl}
           target="_blank"
           rel="noopener noreferrer"
+          download={fileName ?? undefined}
           className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs hover:bg-white/20 transition-colors"
         >
           {docIcon} <span className="underline">{fileName ?? "Document"}</span>
         </a>
       );
     }
-    // Document sent via mediaId — no direct URL
     return (
       <div
         className={`flex items-center gap-2.5 rounded-xl px-3 py-2 ${
@@ -564,9 +582,11 @@ export default function ChatPage({
     const channel = pusher.subscribe(`private-vendor-${vendorUid}`);
     channel.bind(PUSHER_EVENTS.NEW_MESSAGE, (data: any) => {
       if (data.log?.contactId === selectedContactId) {
-        setMessages((prev) =>
-          prev.some((m) => m.id === data.log.id) ? prev : [...prev, data.log],
-        );
+        setMessages((prev) => {
+          const newId = data.log?.id != null ? String(data.log.id) : "";
+          if (!newId || prev.some((m) => String(m.id) === newId)) return prev;
+          return [...prev, data.log];
+        });
       }
       refreshContacts();
     });
@@ -684,6 +704,7 @@ export default function ChatPage({
         contactId: selectedContactId,
         messageType: type,
         mediaId: uploadData.mediaId,
+        mediaUrl: uploadData.url ?? undefined,
         caption: caption || undefined,
         fileName: file.name,
       }),
@@ -1088,7 +1109,7 @@ export default function ChatPage({
                           {msg.messageContent}
                         </p>
                       ) : (
-                        <MediaPreview msg={msg} />
+                        <MediaPreview msg={msg} contactId={selectedContactId} />
                       )}
                       <div
                         className={cn(

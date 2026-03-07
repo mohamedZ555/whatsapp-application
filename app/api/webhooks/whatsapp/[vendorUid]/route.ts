@@ -41,10 +41,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ven
         const from = msg.from;
         const messageType = msg.type;
         let messageContent = '';
+        let logData: Record<string, unknown> = { webhook_responses: { incoming: msg } };
 
-        if (messageType === 'text') messageContent = msg.text?.body ?? '';
-        else if (messageType === 'interactive') {
+        if (messageType === 'text') {
+          messageContent = msg.text?.body ?? '';
+        } else if (messageType === 'interactive') {
           messageContent = msg.interactive?.button_reply?.title ?? msg.interactive?.list_reply?.title ?? '';
+        } else if (messageType === 'image' && msg.image) {
+          messageContent = msg.image.caption ?? null;
+          logData = { mediaId: msg.image.id, fileName: msg.image.filename ?? null, caption: msg.image.caption ?? null, ...logData };
+        } else if (messageType === 'video' && msg.video) {
+          messageContent = msg.video.caption ?? null;
+          logData = { mediaId: msg.video.id, fileName: msg.video.filename ?? null, caption: msg.video.caption ?? null, ...logData };
+        } else if (messageType === 'audio' && msg.audio) {
+          logData = { mediaId: msg.audio.id, fileName: msg.audio.filename ?? 'audio', ...logData };
+        } else if (messageType === 'document' && msg.document) {
+          messageContent = msg.document.caption ?? null;
+          logData = { mediaId: msg.document.id, fileName: msg.document.filename ?? null, caption: msg.document.caption ?? null, ...logData };
         }
 
         // Find or create contact
@@ -77,7 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ven
             wabPhoneNumberId: value.metadata?.phone_number_id,
             waMessageId: msg.id,
             timestamp: msg.timestamp ? new Date(parseInt(msg.timestamp) * 1000) : null,
-            data: { webhook_responses: { incoming: msg } },
+            data: logData,
           },
         });
 
@@ -128,7 +141,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ven
             await getPusherServer().trigger(
               `private-vendor-${vendorUid}`,
               PUSHER_EVENTS.MESSAGE_STATUS,
-              { messageId: status.id, status: status.status }
+              { waMessageId: status.id, status: status.status }
             );
           } catch {}
         }

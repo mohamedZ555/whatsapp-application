@@ -109,11 +109,9 @@ export async function POST(req: NextRequest) {
       isIncomingMessage: false,
       waMessageId: waResponse?.messages?.[0]?.id ?? null,
       wabPhoneNumberId: phoneNumberId,
-      data: mediaId
-        ? { mediaId, fileName }
-        : mediaUrl
-          ? { mediaUrl, fileName }
-          : undefined,
+      data: mediaId || mediaUrl
+        ? { ...(mediaId && { mediaId }), ...(mediaUrl && { mediaUrl }), fileName }
+        : undefined,
     },
   });
 
