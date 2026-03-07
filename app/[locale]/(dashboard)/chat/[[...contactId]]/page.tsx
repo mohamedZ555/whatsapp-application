@@ -609,12 +609,23 @@ export default function ChatPage({
   }, [vendorUid, selectedContactId, refreshContacts]);
 
   /* ── File Selection ── */
+  const VIDEO_MAX_MB = 16;
+  const VIDEO_MAX_BYTES = VIDEO_MAX_MB * 1024 * 1024;
+
   function handleFileSelect(
     e: React.ChangeEvent<HTMLInputElement>,
     forceType?: MediaType,
   ) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const isVideo = file.type.startsWith("video/");
+    if (isVideo && file.size > VIDEO_MAX_BYTES) {
+      alert(
+        `Video is too large. Maximum size is ${VIDEO_MAX_MB} MB (${(file.size / 1024 / 1024).toFixed(1)} MB selected). Please choose a smaller video or compress it.`,
+      );
+      e.target.value = "";
+      return;
+    }
     // Determine the media category: prefer forced type, fallback to mime sniff
     const category: MediaType = forceType ?? getMimeCategory(file.type);
     setSelectedFile(file);
@@ -677,7 +688,8 @@ export default function ChatPage({
     setSending(true);
 
     const fd = new FormData();
-    fd.append("file", file);
+    // Preserve filename so server/WhatsApp can handle video correctly
+    fd.append("file", file, file.name || (file.type.startsWith("video/") ? "video.mp4" : "file"));
     fd.append("contactId", selectedContactId);
 
     const uploadRes = await fetch("/api/chat/upload", {

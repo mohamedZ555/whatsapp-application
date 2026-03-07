@@ -4,10 +4,17 @@ import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { getActorFromSession, getContactScope } from "@/lib/rbac";
 
+// Allow longer execution for large video uploads (e.g. Vercel serverless)
+export const maxDuration = 60;
+
+/** WhatsApp Cloud API video size limit: 16 MB */
+const VIDEO_MAX_BYTES = 16 * 1024 * 1024;
+
 /**
  * POST /api/chat/upload
  * Uploads a media file to WhatsApp's media API and returns the media ID + URL.
  * Body: multipart/form-data with 'file' field and 'contactId' field.
+ * Videos: max 16MB, formats MP4/3GP preferred.
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -28,6 +35,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const fileSize = file.size ?? 0;
+  const isVideo = file.type.startsWith("video/");
+  if (isVideo && fileSize > VIDEO_MAX_BYTES) {
+    return NextResponse.json(
+      {
+        error: `Video is too large. Maximum size is 16 MB (${(fileSize / 1024 / 1024).toFixed(1)} MB selected).`,
+      },
+      { status: 400 },
+    );
+  }
   const contact = await prisma.contact.findFirst({
     where: { id: contactId, ...getContactScope(actor) },
   });
@@ -54,9 +71,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Upload to WhatsApp Media API
+  // Upload to WhatsApp Media API (explicit filename helps video uploads)
+  const fileName = file.name?.trim() || (isVideo ? "video.mp4" : "file");
   const uploadForm = new FormData();
-  uploadForm.append("file", file);
+  uploadForm.append("file", file, fileName);
   uploadForm.append("messaging_product", "whatsapp");
 
   const uploadRes = await fetch(
@@ -70,8 +88,9 @@ export async function POST(req: NextRequest) {
   const uploadData = await uploadRes.json();
 
   if (uploadData.error || !uploadData.id) {
+    const message = uploadData.error?.message ?? "Upload failed.";
     return NextResponse.json(
-      { error: uploadData.error?.message ?? "Upload failed." },
+      { error: typeof message === "string" ? message : "Upload failed." },
       { status: 400 },
     );
   }
