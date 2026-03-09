@@ -271,7 +271,13 @@ function TemplateModal({
 }
 
 /* ─── Media Preview ── */
-function MediaPreview({ msg, contactId }: { msg: any; contactId: string | null }) {
+function MediaPreview({
+  msg,
+  contactId,
+}: {
+  msg: any;
+  contactId: string | null;
+}) {
   const t = useTranslations("chat");
   const mediaData = (msg.data as any) ?? {};
   const type = msg.messageType as string;
@@ -281,9 +287,9 @@ function MediaPreview({ msg, contactId }: { msg: any; contactId: string | null }
     mediaId && contactId
       ? `/api/chat/media?mediaId=${encodeURIComponent(mediaId)}&contactId=${encodeURIComponent(contactId)}`
       : null;
-  const displayUrl = url || proxyUrl;
+  const displayUrl = proxyUrl || url; // Always prefer proxy for auth-protected WhatsApp media
   const fileName = mediaData.fileName ?? null;
-  const caption = msg.messageContent;
+  const caption = msg.messageContent || mediaData.caption;
   const isOut = !msg.isIncomingMessage;
 
   if (type === "image") {
@@ -294,15 +300,19 @@ function MediaPreview({ msg, contactId }: { msg: any; contactId: string | null }
           <img
             src={displayUrl}
             alt="image"
-            className="rounded-lg max-w-[280px] max-h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity"
+            className="rounded-lg max-w-[280px] max-h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity bg-slate-100"
             onClick={() => window.open(displayUrl, "_blank")}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src =
+                "https://placehold.co/280x200?text=Image+Expired";
+            }}
           />
           {caption && <p className="text-xs mt-1 opacity-80">{caption}</p>}
         </div>
       );
     }
     return (
-      <div className="flex items-center gap-2 opacity-80">
+      <div className="flex items-center gap-2 opacity-80 py-1">
         <span>🖼️</span>
         <span className="text-xs">{caption || fileName || t("imageSent")}</span>
       </div>
@@ -312,19 +322,22 @@ function MediaPreview({ msg, contactId }: { msg: any; contactId: string | null }
   if (type === "video") {
     if (displayUrl) {
       return (
-        <div>
+        <div className="space-y-1">
           <video
             src={displayUrl}
             controls
-            className="rounded-lg max-w-[280px] max-h-64"
+            className="rounded-lg max-w-[280px] w-full max-h-80 shadow-sm bg-slate-900"
             preload="metadata"
-          />
-          {caption && <p className="text-xs mt-1 opacity-80">{caption}</p>}
+            poster={mediaData.thumbnail_url}
+          >
+            Your browser does not support the video tag.
+          </video>
+          {caption && <p className="text-xs opacity-80 px-0.5">{caption}</p>}
         </div>
       );
     }
     return (
-      <div className="flex items-center gap-2 opacity-80">
+      <div className="flex items-center gap-2 opacity-80 py-1">
         <span>🎬</span>
         <span className="text-xs">{caption || fileName || t("videoSent")}</span>
       </div>
@@ -334,16 +347,23 @@ function MediaPreview({ msg, contactId }: { msg: any; contactId: string | null }
   if (type === "audio") {
     if (displayUrl) {
       return (
-        <div className="flex items-center gap-2 rounded-xl bg-white/10 px-2 py-1.5">
-          <audio src={displayUrl} controls className="max-w-full min-w-[200px] h-9" />
-        </div>
-      );
-    }
-    if (proxyUrl) {
-      return (
-        <div className="flex items-center gap-2 rounded-xl bg-white/10 px-2 py-1.5">
-          <audio src={proxyUrl} controls className="max-w-full min-w-[200px] h-9" />
-          {fileName && <span className="text-[10px] opacity-75 truncate">{fileName}</span>}
+        <div
+          className={cn(
+            "flex flex-col gap-1 rounded-xl p-2 min-w-[220px]",
+            isOut ? "bg-white/20" : "bg-slate-100",
+          )}
+        >
+          <audio src={displayUrl} controls className="w-full h-8" />
+          {(fileName || caption) && (
+            <span
+              className={cn(
+                "text-[10px] opacity-80 truncate px-1",
+                isOut ? "text-white" : "text-slate-500",
+              )}
+            >
+              {fileName || caption}
+            </span>
+          )}
         </div>
       );
     }
@@ -580,8 +600,13 @@ export default function ChatPage({
     if (!vendorUid) return;
     const pusher = getPusherClient();
     const channel = pusher.subscribe(`private-vendor-${vendorUid}`);
-    channel.bind(PUSHER_EVENTS.NEW_MESSAGE, (data: any) => {
-      if (data.log?.contactId === selectedContactId) {
+    const onNewMessage = (data: any) => {
+      const incomingContactId =
+        data.log?.contactId != null ? String(data.log.contactId) : "";
+      if (
+        incomingContactId &&
+        incomingContactId === String(selectedContactId)
+      ) {
         setMessages((prev) => {
           const newId = data.log?.id != null ? String(data.log.id) : "";
           if (!newId || prev.some((m) => String(m.id) === newId)) return prev;
@@ -589,7 +614,9 @@ export default function ChatPage({
         });
       }
       refreshContacts();
-    });
+    };
+
+    channel.bind(PUSHER_EVENTS.NEW_MESSAGE, onNewMessage);
     channel.bind(PUSHER_EVENTS.MESSAGE_STATUS, (data: any) => {
       if (data.waMessageId && data.status) {
         setMessages((prev) =>
@@ -665,7 +692,7 @@ export default function ChatPage({
         });
         const file = new File([blob], "voice.ogg", { type: "audio/ogg" });
         stream.getTracks().forEach((t) => t.stop());
-        await sendMedia(file, "audio");
+        await sendMedia(file, "audio", true);
       };
       mr.start();
       setMediaRecorder(mr);
@@ -682,52 +709,72 @@ export default function ChatPage({
   }
 
   /* ── Upload & Send Media ── */
-  async function sendMedia(file: File, overrideType?: MediaType) {
+  async function sendMedia(
+    file: File,
+    overrideType?: MediaType,
+    isPTT = false,
+  ) {
     if (!selectedContactId) return;
     setUploading(true);
     setSending(true);
 
-    const fd = new FormData();
-    // Preserve filename so server/WhatsApp can handle video correctly
-    fd.append("file", file, file.name || (file.type.startsWith("video/") ? "video.mp4" : "file"));
-    fd.append("contactId", selectedContactId);
+    try {
+      const fd = new FormData();
+      // Preserve filename so server/WhatsApp can handle video correctly
+      fd.append(
+        "file",
+        file,
+        file.name || (file.type.startsWith("video/") ? "video.mp4" : "file"),
+      );
+      fd.append("contactId", selectedContactId);
 
-    const uploadRes = await fetch("/api/chat/upload", {
-      method: "POST",
-      body: fd,
-    });
-    const uploadData = await uploadRes.json();
-    setUploading(false);
+      const uploadRes = await fetch("/api/chat/upload", {
+        method: "POST",
+        body: fd,
+      });
+      const uploadData = await uploadRes.json();
+      setUploading(false);
 
-    if (!uploadData.success) {
-      alert(uploadData.error ?? "Upload failed.");
+      if (!uploadData.success) {
+        alert(uploadData.error ?? "Upload failed.");
+        setSending(false);
+        cancelFile();
+        return;
+      }
+
+      // Use explicit override → selectedFileType → mime sniff
+      const type: MediaType =
+        overrideType ?? selectedFileType ?? getMimeCategory(file.type);
+      const res = await fetch("/api/chat/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contactId: selectedContactId,
+          messageType: type,
+          mediaId: uploadData.mediaId,
+          mediaUrl: uploadData.url ?? undefined,
+          caption: caption || undefined,
+          fileName: file.name,
+          isPTT: isPTT, // Send hint that this is a voice record
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessages((prev) => {
+          const newId = data.data?.id != null ? String(data.data.id) : "";
+          if (newId && prev.some((m) => String(m.id) === newId)) return prev;
+          return [...prev, data.data];
+        });
+        cancelFile();
+      } else {
+        alert(data.error ?? "Failed to send media.");
+      }
+    } catch (err) {
+      console.error("Send media error:", err);
+      alert("An error occurred while sending media.");
+    } finally {
       setSending(false);
-      cancelFile();
-      return;
-    }
-
-    // Use explicit override → selectedFileType → mime sniff
-    const type: MediaType =
-      overrideType ?? selectedFileType ?? getMimeCategory(file.type);
-    const res = await fetch("/api/chat/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contactId: selectedContactId,
-        messageType: type,
-        mediaId: uploadData.mediaId,
-        mediaUrl: uploadData.url ?? undefined,
-        caption: caption || undefined,
-        fileName: file.name,
-      }),
-    });
-    const data = await res.json();
-    setSending(false);
-    if (data.success) {
-      setMessages((prev) => [...prev, data.data]);
-      cancelFile();
-    } else {
-      alert(data.error ?? "Failed to send media.");
+      setUploading(false);
     }
   }
 
@@ -740,22 +787,32 @@ export default function ChatPage({
     }
     if (!text.trim() || !selectedContactId || sending) return;
     setSending(true);
-    const res = await fetch("/api/chat/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contactId: selectedContactId,
-        messageType: "text",
-        messageContent: text,
-      }),
-    });
-    const data = await res.json();
-    setSending(false);
-    if (data.success) {
-      setText("");
-      setMessages((prev) => [...prev, data.data]);
-    } else {
-      alert(data.error ?? "Failed to send message.");
+    try {
+      const res = await fetch("/api/chat/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contactId: selectedContactId,
+          messageType: "text",
+          messageContent: text,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setText("");
+        setMessages((prev) => {
+          const newId = data.data?.id != null ? String(data.data.id) : "";
+          if (newId && prev.some((m) => String(m.id) === newId)) return prev;
+          return [...prev, data.data];
+        });
+      } else {
+        alert(data.error ?? "Failed to send message.");
+      }
+    } catch (err) {
+      console.error("Send text error:", err);
+      alert("An error occurred while sending the message.");
+    } finally {
+      setSending(false);
     }
   }
 
@@ -1475,7 +1532,14 @@ export default function ChatPage({
         <TemplateModal
           contactId={selectedContactId}
           onClose={() => setShowTemplateModal(false)}
-          onSent={(msg) => setMessages((prev) => [...prev, msg])}
+          onSent={(msg) => {
+            setMessages((prev) => {
+              const newId = msg?.id != null ? String(msg.id) : "";
+              if (newId && prev.some((m) => String(m.id) === newId))
+                return prev;
+              return [...prev, msg];
+            });
+          }}
         />
       )}
 

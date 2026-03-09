@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     mediaUrl,
     caption,
     fileName,
+    isPTT,
   } = await req.json();
 
   const contact = await prisma.contact.findFirst({
@@ -78,8 +79,10 @@ export async function POST(req: NextRequest) {
     });
   } else if (["image", "video", "audio", "document"].includes(messageType)) {
     const mediaObj: any = mediaId ? { id: mediaId } : { link: mediaUrl };
-    if (caption) mediaObj.caption = caption;
+    // Audio does not support captions in WhatsApp Cloud API
+    if (caption && messageType !== "audio") mediaObj.caption = caption;
     if (fileName && messageType === "document") mediaObj.filename = fileName;
+
     waResponse = await sendWAMessage(phoneNumberId, accessToken, {
       to: contact.waId,
       type: messageType,
@@ -109,9 +112,14 @@ export async function POST(req: NextRequest) {
       isIncomingMessage: false,
       waMessageId: waResponse?.messages?.[0]?.id ?? null,
       wabPhoneNumberId: phoneNumberId,
-      data: mediaId || mediaUrl
-        ? { ...(mediaId && { mediaId }), ...(mediaUrl && { mediaUrl }), fileName }
-        : undefined,
+      data:
+        mediaId || mediaUrl
+          ? {
+              ...(mediaId && { mediaId }),
+              ...(mediaUrl && { mediaUrl }),
+              fileName,
+            }
+          : undefined,
     },
   });
 
