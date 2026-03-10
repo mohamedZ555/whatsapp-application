@@ -1027,7 +1027,16 @@
     "voiceMessage": "Voice message",
     "document": "Document",
     "audio": "Audio",
-    "templateMessage": "Template message"
+    "templateMessage": "Template message",
+    "templateParams": "{type} Parameters",
+    "videoTooLarge": "Video is too large. Maximum size is {maxMb} MB ({selectedMb} MB selected). Please choose a smaller video or compress it.",
+    "micDenied": "Microphone access denied.",
+    "uploadFailed": "Upload failed.",
+    "sendMediaFailed": "Failed to send media.",
+    "sendMediaError": "An error occurred while sending media.",
+    "sendFailed": "Failed to send message.",
+    "sendError": "An error occurred while sending the message.",
+    "clearFailed": "Failed to clear chat."
   },
   "errors": {
     "required": "This field is required.",

@@ -26,7 +26,10 @@
       "Bash(cd D:/whatsapp-application && npx prisma generate --no-engine 2>&1)",
       "Bash(python3:*)",
       "Bash(node:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(icacls:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(powershell:*)"
     ]
   }
 }

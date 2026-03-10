@@ -218,7 +218,7 @@ function TemplateModal({
                       return (
                         <div key={type} className="mt-3 space-y-2">
                           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                            {type} Parameters
+                            {t("templateParams", { type })}
                           </p>
                           {matches.map((_: any, idx: number) => (
                             <input
@@ -415,7 +415,7 @@ function MediaPreview({
           download={fileName ?? undefined}
           className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs hover:bg-white/20 transition-colors"
         >
-          {docIcon} <span className="underline">{fileName ?? "Document"}</span>
+          {docIcon} <span className="underline">{fileName ?? t("document")}</span>
         </a>
       );
     }
@@ -436,7 +436,7 @@ function MediaPreview({
           <p
             className={`text-xs font-medium ${isOut ? "text-white" : "text-slate-700"}`}
           >
-            {fileName ?? "Document"}
+            {fileName ?? t("document")}
           </p>
           <p
             className={`text-[10px] ${isOut ? "text-white/60" : "text-slate-400"}`}
@@ -450,11 +450,53 @@ function MediaPreview({
 
   if (type === "template") {
     return (
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs opacity-75">📋</span>
-        <span className="text-xs">
-          {mediaData.templateName ?? "Template message"}
-        </span>
+      <div
+        className={cn(
+          "flex flex-col gap-2 rounded-xl p-3 min-w-[220px] shadow-sm border-2",
+          isOut
+            ? "bg-emerald-600/10 border-white/20 text-white"
+            : "bg-slate-50 border-slate-200 text-slate-800",
+        )}
+      >
+        <div
+          className={cn(
+            "flex items-center justify-between border-b pb-2 mb-1",
+            isOut ? "border-white/10" : "border-slate-200",
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <div
+              className={cn(
+                "p-1.5 rounded-lg shadow-inner",
+                isOut ? "bg-white/10" : "bg-emerald-100",
+              )}
+            >
+              <span className="text-lg leading-none">📋</span>
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-widest opacity-70">
+              {t("templateMessage")}
+            </span>
+          </div>
+          <div
+            className={cn(
+              "w-2 h-2 rounded-full",
+              isOut ? "bg-white/40" : "bg-emerald-500",
+            )}
+          />
+        </div>
+        <div className="px-1">
+          <p className="text-sm font-bold leading-snug line-clamp-2">
+            {mediaData.templateName}
+          </p>
+          <p
+            className={cn(
+              "text-[10px] mt-1 italic opacity-60",
+              isOut ? "text-white" : "text-slate-500",
+            )}
+          >
+            WhatsApp Official Template
+          </p>
+        </div>
       </div>
     );
   }
@@ -575,10 +617,10 @@ export default function ChatPage({
       .then((d) => {
         setMessages(d.messages ?? []);
         setActiveContact(d.contact ?? null);
-        refreshContacts();
+        refreshContactsRef.current();
       })
       .catch(() => {});
-  }, [selectedContactId, refreshContacts]);
+  }, [selectedContactId]);
 
   useEffect(() => {
     if (!activeContact || !canAssign) return;
@@ -596,28 +638,80 @@ export default function ChatPage({
   }, [messages]);
 
   // Pusher real-time
+  const selectedContactIdRef = useRef<string | null>(selectedContactId);
+  const refreshContactsRef = useRef(refreshContacts);
+
+  useEffect(() => {
+    console.log("ChatPage: mounted, vendorUid:", vendorUid, "selectedContactId:", selectedContactId);
+  }, [vendorUid, selectedContactId]);
+
+  useEffect(() => {
+    selectedContactIdRef.current = selectedContactId;
+  }, [selectedContactId]);
+
+  useEffect(() => {
+    refreshContactsRef.current = refreshContacts;
+  }, [refreshContacts]);
+
   useEffect(() => {
     if (!vendorUid) return;
     const pusher = getPusherClient();
-    const channel = pusher.subscribe(`private-vendor-${vendorUid}`);
+    const channelName = `private-vendor-${vendorUid}`;
+    const channel = pusher.subscribe(channelName);
+
+    channel.bind("pusher:subscription_succeeded", () => {
+      console.log("Pusher: Subscription SUCCEEDED for", channelName);
+    });
+
+    channel.bind("pusher:subscription_error", (err: any) => {
+      console.error("Pusher: Subscription ERROR for", channelName, err);
+    });
+
     const onNewMessage = (data: any) => {
+      console.log("Pusher: NEW_MESSAGE received", data);
       const incomingContactId =
         data.log?.contactId != null ? String(data.log.contactId) : "";
+      const currentId = selectedContactIdRef.current;
+
+      console.log("Pusher: Comparing IDs", { incomingContactId, currentId });
+
       if (
         incomingContactId &&
-        incomingContactId === String(selectedContactId)
+        currentId &&
+        incomingContactId === String(currentId)
       ) {
-        setMessages((prev) => {
-          const newId = data.log?.id != null ? String(data.log.id) : "";
-          if (!newId || prev.some((m) => String(m.id) === newId)) return prev;
-          return [...prev, data.log];
-        });
+        // Append from Pusher immediately for instant feedback
+        if (data.log?.id) {
+          setMessages((prev) => {
+            const newId = String(data.log.id);
+            if (prev.some((m) => String(m.id) === newId)) return prev;
+            const newMsg = {
+              ...data.log,
+              createdAt: data.log.createdAt || new Date().toISOString(),
+            };
+            return [...prev, newMsg];
+          });
+        }
+        // Also re-fetch from DB to ensure we have complete data
+        setTimeout(() => {
+          const cid = selectedContactIdRef.current;
+          if (cid) {
+            fetch(`/api/chat/messages/${cid}`)
+              .then((r) => r.json())
+              .then((d) => {
+                if (d.messages?.length) setMessages(d.messages);
+                if (d.contact) setActiveContact(d.contact);
+              })
+              .catch(() => {});
+          }
+        }, 600);
       }
-      refreshContacts();
+      refreshContactsRef.current();
     };
 
     channel.bind(PUSHER_EVENTS.NEW_MESSAGE, onNewMessage);
     channel.bind(PUSHER_EVENTS.MESSAGE_STATUS, (data: any) => {
+      console.log("Pusher: MESSAGE_STATUS received", data);
       if (data.waMessageId && data.status) {
         setMessages((prev) =>
           prev.map((m) =>
@@ -628,12 +722,34 @@ export default function ChatPage({
         );
       }
     });
-    channel.bind(PUSHER_EVENTS.CONTACT_UPDATE, () => refreshContacts());
+    channel.bind(PUSHER_EVENTS.CONTACT_UPDATE, () => {
+      console.log("Pusher: CONTACT_UPDATE received");
+      refreshContactsRef.current();
+    });
+
     return () => {
       channel.unbind_all();
-      pusher.unsubscribe(`private-vendor-${vendorUid}`);
+      pusher.unsubscribe(channelName);
     };
-  }, [vendorUid, selectedContactId, refreshContacts]);
+  }, [vendorUid]);
+
+  // Re-fetch messages when window regains focus (fallback for missed Pusher events)
+  useEffect(() => {
+    function onFocus() {
+      const cid = selectedContactIdRef.current;
+      if (!cid) return;
+      fetch(`/api/chat/messages/${cid}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.messages?.length) setMessages(d.messages);
+          if (d.contact) setActiveContact(d.contact);
+        })
+        .catch(() => {});
+      refreshContactsRef.current();
+    }
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
 
   /* ── File Selection ── */
   const VIDEO_MAX_MB = 16;
@@ -647,9 +763,7 @@ export default function ChatPage({
     if (!file) return;
     const isVideo = file.type.startsWith("video/");
     if (isVideo && file.size > VIDEO_MAX_BYTES) {
-      alert(
-        `Video is too large. Maximum size is ${VIDEO_MAX_MB} MB (${(file.size / 1024 / 1024).toFixed(1)} MB selected). Please choose a smaller video or compress it.`,
-      );
+      alert(t("videoTooLarge", { maxMb: VIDEO_MAX_MB, selectedMb: (file.size / 1024 / 1024).toFixed(1) }));
       e.target.value = "";
       return;
     }
@@ -682,23 +796,63 @@ export default function ChatPage({
   /* ── Voice Recording ── */
   async function startRecording() {
     try {
+      // WhatsApp supported audio types: audio/aac, audio/mp4, audio/mpeg, audio/amr, audio/ogg, audio/opus
+      const mimeTypes = [
+        "audio/ogg; codecs=opus",
+        "audio/opus",
+        "audio/ogg",
+        "audio/webm; codecs=opus",
+        "audio/webm",
+        "audio/mpeg",
+      ];
+      let selectedMimeType = "";
+      for (const m of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(m)) {
+          selectedMimeType = m;
+          break;
+        }
+      }
+
+      console.log("ChatPage: startRecording, using mimeType:", selectedMimeType);
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
+      const mr = new MediaRecorder(stream, { mimeType: selectedMimeType });
       audioChunks.current = [];
       mr.ondataavailable = (e) => audioChunks.current.push(e.data);
       mr.onstop = async () => {
         const blob = new Blob(audioChunks.current, {
-          type: "audio/ogg; codecs=opus",
+          type: selectedMimeType,
         });
-        const file = new File([blob], "voice.ogg", { type: "audio/ogg" });
+
+        // WhatsApp DOES NOT support audio/webm.
+        // If the browser only supports webm, we "re-label" it to audio/ogg
+        // because the underlying opus codec is usually compatible.
+        let finalMimeType = selectedMimeType;
+        let ext = "ogg";
+
+        if (selectedMimeType.includes("webm")) {
+          finalMimeType = "audio/ogg"; // Disguise WebM as OGG for WhatsApp
+          ext = "ogg";
+        } else if (selectedMimeType.includes("ogg")) {
+          finalMimeType = "audio/ogg";
+          ext = "ogg";
+        } else if (selectedMimeType.includes("mpeg")) {
+          finalMimeType = "audio/mpeg";
+          ext = "mp3";
+        }
+
+        const file = new File([blob], `voice.${ext}`, { type: finalMimeType });
+        console.log("ChatPage: final file to send:", { name: file.name, type: file.type });
+
         stream.getTracks().forEach((t) => t.stop());
         await sendMedia(file, "audio", true);
       };
       mr.start();
       setMediaRecorder(mr);
       setRecording(true);
-    } catch {
-      alert("Microphone access denied.");
+    } catch (err) {
+      console.error("ChatPage: startRecording error:", err);
+      alert(t("micDenied"));
     }
   }
 
@@ -736,7 +890,7 @@ export default function ChatPage({
       setUploading(false);
 
       if (!uploadData.success) {
-        alert(uploadData.error ?? "Upload failed.");
+        alert(uploadData.error ?? t("uploadFailed"));
         setSending(false);
         cancelFile();
         return;
@@ -767,11 +921,11 @@ export default function ChatPage({
         });
         cancelFile();
       } else {
-        alert(data.error ?? "Failed to send media.");
+        alert(data.error ?? t("sendMediaFailed"));
       }
     } catch (err) {
       console.error("Send media error:", err);
-      alert("An error occurred while sending media.");
+      alert(t("sendMediaError"));
     } finally {
       setSending(false);
       setUploading(false);
@@ -806,11 +960,11 @@ export default function ChatPage({
           return [...prev, data.data];
         });
       } else {
-        alert(data.error ?? "Failed to send message.");
+        alert(data.error ?? t("sendFailed"));
       }
     } catch (err) {
       console.error("Send text error:", err);
-      alert("An error occurred while sending the message.");
+      alert(t("sendError"));
     } finally {
       setSending(false);
     }
@@ -848,7 +1002,7 @@ export default function ChatPage({
       setMessages([]);
       refreshContacts();
     } else {
-      alert(data.error ?? "Failed to clear chat.");
+      alert(data.error ?? t("clearFailed"));
     }
   }
 
@@ -862,8 +1016,12 @@ export default function ChatPage({
   const messagesWithDates = messages.reduce<
     Array<{ type: "date" | "msg"; date?: string; msg?: any }>
   >((acc, msg, i) => {
+    if (!msg.createdAt) {
+      acc.push({ type: "msg", msg });
+      return acc;
+    }
     const prev = messages[i - 1];
-    if (!prev || !isSameDay(prev.createdAt, msg.createdAt)) {
+    if (!prev || !prev.createdAt || !isSameDay(prev.createdAt, msg.createdAt)) {
       acc.push({
         type: "date",
         date: formatDate(msg.createdAt, todayLabel, yesterdayLabel),
@@ -918,7 +1076,7 @@ export default function ChatPage({
             />
           </div>
           <p className="text-[11px] text-slate-400 mt-2">
-            {contacts.length} conversation{contacts.length !== 1 ? "s" : ""}
+            {t("conversations", { count: contacts.length })}
           </p>
         </div>
 
@@ -926,7 +1084,7 @@ export default function ChatPage({
           {contacts.length === 0 && (
             <div className="py-12 text-center text-slate-400 text-sm">
               <p className="text-3xl mb-2">📭</p>
-              <p>No conversations yet</p>
+              <p>{t("noConversations")}</p>
             </div>
           )}
           {contacts.map((c) => {
@@ -940,15 +1098,15 @@ export default function ChatPage({
               lastMsg?.messageType === "text"
                 ? lastMsg.messageContent
                 : lastMsg?.messageType === "image"
-                  ? "📷 Image"
+                  ? `📷 ${t("attachImage")}`
                   : lastMsg?.messageType === "video"
-                    ? "🎥 Video"
+                    ? `🎥 ${t("attachVideo")}`
                     : lastMsg?.messageType === "audio"
-                      ? "🎵 Audio"
+                      ? `🎵 ${t("audio")}`
                       : lastMsg?.messageType === "document"
-                        ? "📎 Document"
+                        ? `📎 ${t("document")}`
                         : lastMsg?.messageType === "template"
-                          ? "📋 Template"
+                          ? `📋 ${t("templateMessage")}`
                           : c.waId;
 
             return (
@@ -1030,9 +1188,6 @@ export default function ChatPage({
                 💬
               </div>
               <p className="text-slate-500 font-medium">{t("selectContact")}</p>
-              <p className="text-slate-400 text-sm">
-                Select a conversation to start chatting
-              </p>
             </div>
           </div>
         ) : (
@@ -1079,7 +1234,7 @@ export default function ChatPage({
                     <button
                       onClick={() => setMenuOpen((o) => !o)}
                       className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors text-lg font-bold"
-                      title="More options"
+                      title={t("moreOptions")}
                     >
                       ⋮
                     </button>
@@ -1094,7 +1249,7 @@ export default function ChatPage({
                         >
                           <span>📋</span>
                           <span className="text-start">
-                            Send Template Message
+                            {t("sendTemplate")}
                           </span>
                         </button>
                         {isAdmin && (
@@ -1124,14 +1279,16 @@ export default function ChatPage({
             </div>
 
             {/* ── Messages Area ── */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+            <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scroll-smooth">
               {messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
-                  <div className="text-center text-slate-400 text-sm">
-                    <p className="text-3xl mb-2">👋</p>
-                    <p>No messages yet</p>
-                    <p className="text-xs mt-1">
-                      Send a message to start the conversation
+                  <div className="text-center text-slate-400 bg-white/50 backdrop-blur-sm p-8 rounded-3xl border border-dashed border-slate-200 shadow-inner">
+                    <p className="text-5xl mb-4 grayscale opacity-50">�</p>
+                    <p className="font-semibold text-slate-600">
+                      {t("noMessages")}
+                    </p>
+                    <p className="text-xs mt-2 text-slate-400 max-w-[200px] mx-auto">
+                      {t("noMessagesHint")}
                     </p>
                   </div>
                 </div>
@@ -1142,13 +1299,13 @@ export default function ChatPage({
                   return (
                     <div
                       key={`date-${idx}`}
-                      className="flex items-center gap-3 py-2"
+                      className="flex items-center gap-4 py-4"
                     >
-                      <div className="flex-1 h-px bg-slate-200" />
-                      <span className="text-[11px] text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-200 font-medium shadow-sm">
+                      <div className="flex-1 h-px bg-slate-200/60" />
+                      <span className="text-[11px] text-slate-500 bg-white/80 backdrop-blur-sm px-4 py-1.5 rounded-full border border-slate-200 font-bold uppercase tracking-wider shadow-sm">
                         {item.date}
                       </span>
-                      <div className="flex-1 h-px bg-slate-200" />
+                      <div className="flex-1 h-px bg-slate-200/60" />
                     </div>
                   );
                 }
@@ -1160,47 +1317,57 @@ export default function ChatPage({
                   <div
                     key={msg.id}
                     className={cn(
-                      "flex",
-                      isOut ? "justify-end" : "justify-start",
-                      "mb-1",
+                      "flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300",
+                      isOut ? "items-end" : "items-start",
                     )}
                   >
                     <div
                       className={cn(
-                        "relative max-w-[70%] rounded-2xl px-3 py-2 shadow-sm",
+                        "group relative max-w-[75%] px-4 py-3 shadow-md transition-all",
                         isOut
-                          ? "bg-emerald-500 text-white rounded-br-sm"
-                          : "bg-white text-slate-800 rounded-bl-sm border border-slate-100",
+                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-2xl rounded-tr-none hover:shadow-lg hover:shadow-emerald-200"
+                          : "bg-white text-slate-800 rounded-2xl rounded-tl-none border border-slate-100 hover:shadow-lg hover:shadow-slate-100",
                       )}
                     >
                       {isText ? (
-                        <p className="text-sm whitespace-pre-wrap break-words">
+                        <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap break-words">
                           {msg.messageContent}
                         </p>
                       ) : (
                         <MediaPreview msg={msg} contactId={selectedContactId} />
                       )}
+
                       <div
                         className={cn(
-                          "flex items-center gap-1 mt-1",
+                          "flex items-center gap-1.5 mt-2",
                           isOut ? "justify-end" : "justify-start",
                         )}
                       >
                         <span
                           className={cn(
-                            "text-[10px]",
-                            isOut ? "text-white/60" : "text-slate-400",
+                            "text-[10px] font-medium opacity-70",
+                            isOut ? "text-emerald-50" : "text-slate-400",
                           )}
                         >
                           {formatTime(msg.createdAt)}
                         </span>
                         {isOut && <MessageStatus status={msg.status} />}
                       </div>
+
+                      {/* Tail decoration */}
+                      <div
+                        className={cn(
+                          "absolute top-0 w-2 h-3",
+                          isOut
+                            ? "-right-1.5 bg-emerald-500 [clip-path:polygon(0_0,0_100%,100%_0)]"
+                            : "-left-1.5 bg-white border-l border-t border-slate-100 [clip-path:polygon(100%_0,100%_100%,0_0)]",
+                        )}
+                      />
                     </div>
                   </div>
                 );
               })}
-              <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} className="h-4" />
             </div>
 
             {/* ── File Preview Bar ── */}
@@ -1266,7 +1433,7 @@ export default function ChatPage({
                     {selectedFileType !== "audio" && (
                       <input
                         className="w-full mt-1.5 text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
-                        placeholder="Add a caption…"
+                        placeholder={t("addCaption")}
                         value={caption}
                         onChange={(e) => setCaption(e.target.value)}
                       />
@@ -1552,11 +1719,10 @@ export default function ChatPage({
               <div className="text-center mb-4">
                 <div className="text-4xl mb-3">🗑️</div>
                 <h3 className="font-bold text-slate-800 text-lg">
-                  Clear Chat History?
+                  {t("clearChatTitle")}
                 </h3>
                 <p className="text-sm text-slate-500 mt-2">
-                  This will permanently delete <strong>all messages</strong> in
-                  this conversation. This cannot be undone.
+                  {t("clearChatDesc")}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -1564,14 +1730,14 @@ export default function ChatPage({
                   onClick={() => setClearConfirm(false)}
                   className="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 font-medium"
                 >
-                  Cancel
+                  {tc("cancel")}
                 </button>
                 <button
                   onClick={handleClearChat}
                   disabled={clearing}
                   className="flex-1 rounded-xl bg-red-500 text-white px-4 py-2.5 text-sm font-semibold hover:bg-red-600 disabled:opacity-50"
                 >
-                  {clearing ? "Clearing…" : "Clear All Messages"}
+                  {clearing ? t("clearing") : t("clearAll")}
                 </button>
               </div>
             </div>

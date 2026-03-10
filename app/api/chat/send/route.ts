@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
     // Audio does not support captions in WhatsApp Cloud API
     if (caption && messageType !== "audio") mediaObj.caption = caption;
     if (fileName && messageType === "document") mediaObj.filename = fileName;
+    if (messageType === "audio" && isPTT) mediaObj.voice = true;
 
     waResponse = await sendWAMessage(phoneNumberId, accessToken, {
       to: contact.waId,
@@ -96,11 +97,22 @@ export async function POST(req: NextRequest) {
   }
 
   if (waResponse?.error) {
+    console.error("WhatsApp API Error:", {
+      error: waResponse.error,
+      contact: contact.waId,
+      messageType,
+      mediaId,
+    });
     return NextResponse.json(
       { error: waResponse.error.message ?? "WhatsApp API error." },
       { status: 400 },
     );
   }
+
+  console.log("WhatsApp API Success:", {
+    waMessageId: waResponse?.messages?.[0]?.id,
+    contact: contact.waId,
+  });
 
   const log = await prisma.whatsappMessageLog.create({
     data: {
@@ -134,10 +146,13 @@ export async function POST(req: NextRequest) {
   });
   if (vendor && process.env.PUSHER_APP_ID) {
     try {
+      // Send lean payload to stay within Pusher's 10KB limit
+      const { data: logData, ...logRest } = log;
+      const pusherLog = { ...logRest, ...(logData !== undefined && { data: logData }) };
       await getPusherServer().trigger(
         `private-vendor-${vendor.uid}`,
         PUSHER_EVENTS.NEW_MESSAGE,
-        { log },
+        { log: pusherLog },
       );
     } catch {}
   }

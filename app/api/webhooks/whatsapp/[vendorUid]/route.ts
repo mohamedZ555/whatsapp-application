@@ -26,8 +26,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ven
   const { vendorUid } = await params;
   const body = await req.json();
 
+  console.log('Webhook: Received POST for vendorUid:', vendorUid);
+
   const vendor = await prisma.vendor.findUnique({ where: { uid: vendorUid } });
-  if (!vendor) return new NextResponse('Not found', { status: 404 });
+  if (!vendor) {
+    console.warn('Webhook: Vendor not found for uid:', vendorUid);
+    return new NextResponse('Not found', { status: 404 });
+  }
+
+  console.log('Webhook: Found vendor:', { id: vendor.id, uid: vendor.uid });
 
   try {
     const entry = body?.entry?.[0];
@@ -59,6 +66,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ven
         } else if (messageType === 'document' && msg.document) {
           messageContent = msg.document.caption ?? null;
           logData = { mediaId: msg.document.id, fileName: msg.document.filename ?? null, caption: msg.document.caption ?? null, ...logData };
+        } else if (messageType === 'button') {
+          messageContent = msg.button?.text ?? '';
         }
 
         // Find or create contact
@@ -104,12 +113,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ven
         // Broadcast via Pusher
         if (process.env.PUSHER_APP_ID) {
           try {
+            // Send lean payload to avoid Pusher's 10KB limit
+            // Strip webhook_responses (can be very large for media messages)
+            const { data: logData, ...logRest } = log;
+            const leanData = logData && typeof logData === 'object' && !Array.isArray(logData)
+              ? (() => { const { webhook_responses, ...rest } = logData as Record<string, unknown>; return Object.keys(rest).length ? rest : undefined; })()
+              : logData;
+            const pusherLog = { ...logRest, ...(leanData !== undefined && { data: leanData }) };
+
+            console.log('Webhook: Triggering NEW_MESSAGE via Pusher', {
+              channel: `private-vendor-${vendorUid}`,
+              contactId: contact.id,
+              logId: log.id
+            });
             await getPusherServer().trigger(
-              `private-vendor-${vendorUid}`,
-              PUSHER_EVENTS.NEW_MESSAGE,
-              { log, contact }
-            );
-          } catch {}
+               `private-vendor-${vendorUid}`,
+               PUSHER_EVENTS.NEW_MESSAGE,
+               { log: pusherLog, contact }
+             );
+
+             // Also trigger contact update to refresh the sidebar
+             await getPusherServer().trigger(
+               `private-vendor-${vendorUid}`,
+               PUSHER_EVENTS.CONTACT_UPDATE,
+               {}
+             );
+           } catch (err) {
+            console.error('Webhook: Pusher trigger error:', err);
+          }
+        } else {
+          console.warn('Webhook: PUSHER_APP_ID not found, skipping broadcast');
         }
 
         // Process bot replies

@@ -1029,7 +1029,16 @@
     "voiceMessage": "رسالة صوتية",
     "document": "مستند",
     "audio": "صوت",
-    "templateMessage": "رسالة قالب"
+    "templateMessage": "رسالة قالب",
+    "templateParams": "معاملات {type}",
+    "videoTooLarge": "الفيديو كبير جداً. الحجم الأقصى هو {maxMb} ميغابايت (تم اختيار {selectedMb} ميغابايت). يرجى اختيار فيديو أصغر أو ضغطه.",
+    "micDenied": "تم رفض الوصول إلى الميكروفون.",
+    "uploadFailed": "فشل رفع الملف.",
+    "sendMediaFailed": "فشل إرسال الوسائط.",
+    "sendMediaError": "حدث خطأ أثناء إرسال الوسائط.",
+    "sendFailed": "فشل إرسال الرسالة.",
+    "sendError": "حدث خطأ أثناء إرسال الرسالة.",
+    "clearFailed": "فشل مسح المحادثة."
   },
   "errors": {
     "required": "هذا الحقل مطلوب.",
