@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { cn, getInitials } from "@/lib/utils";
@@ -51,14 +51,29 @@ function getMimeCategory(mime: string): MediaType {
 }
 
 /* ─── Message Status Icon ── */
+function CheckSingle({ cls }: { cls: string }) {
+  return (
+    <svg viewBox="0 0 12 11" width="14" height="11" className={cls} fill="currentColor">
+      <path d="M11.071.653a.75.75 0 0 1 .025 1.06l-6.5 7a.75.75 0 0 1-1.096-.01l-3-3.5a.75.75 0 1 1 1.146-.97l2.455 2.864 5.91-6.369a.75.75 0 0 1 1.06-.075z" />
+    </svg>
+  );
+}
+function CheckDouble({ cls }: { cls: string }) {
+  return (
+    <svg viewBox="0 0 16 11" width="18" height="11" className={cls} fill="currentColor">
+      <path d="M15.01.653a.75.75 0 0 1 .025 1.06l-6.5 7a.75.75 0 0 1-1.096-.01l-1.25-1.458 1.14-.977.693.808 5.928-6.448a.75.75 0 0 1 1.06-.975zM8.5 8.713l-3-3.5a.75.75 0 1 0-1.146.97l3 3.5a.75.75 0 0 0 1.096.01l.193-.207-1.14-.977-.003.004z" />
+      <path d="M1 5.5l2.5 3 .85-.726L1.85 4.53A.75.75 0 0 0 1 5.5z" />
+    </svg>
+  );
+}
 function MessageStatus({ status }: { status?: string }) {
   if (status === "read")
-    return <span className="text-blue-400 text-[11px]">✓✓</span>;
+    return <CheckDouble cls="text-blue-300 inline-block" />;
   if (status === "delivered")
-    return <span className="text-white/70 text-[11px]">✓✓</span>;
+    return <CheckDouble cls="text-white/70 inline-block" />;
   if (status === "sent")
-    return <span className="text-white/50 text-[11px]">✓</span>;
-  return <span className="text-white/30 text-[11px]">⏱</span>;
+    return <CheckSingle cls="text-white/60 inline-block" />;
+  return <span className="text-white/30 text-[11px] leading-none">🕐</span>;
 }
 
 /* ─── Template Modal ── */
@@ -642,10 +657,6 @@ export default function ChatPage({
   const refreshContactsRef = useRef(refreshContacts);
 
   useEffect(() => {
-    console.log("ChatPage: mounted, vendorUid:", vendorUid, "selectedContactId:", selectedContactId);
-  }, [vendorUid, selectedContactId]);
-
-  useEffect(() => {
     selectedContactIdRef.current = selectedContactId;
   }, [selectedContactId]);
 
@@ -659,21 +670,14 @@ export default function ChatPage({
     const channelName = `private-vendor-${vendorUid}`;
     const channel = pusher.subscribe(channelName);
 
-    channel.bind("pusher:subscription_succeeded", () => {
-      console.log("Pusher: Subscription SUCCEEDED for", channelName);
-    });
-
     channel.bind("pusher:subscription_error", (err: any) => {
-      console.error("Pusher: Subscription ERROR for", channelName, err);
+      console.error("Pusher: subscription error", channelName, err);
     });
 
     const onNewMessage = (data: any) => {
-      console.log("Pusher: NEW_MESSAGE received", data);
       const incomingContactId =
         data.log?.contactId != null ? String(data.log.contactId) : "";
       const currentId = selectedContactIdRef.current;
-
-      console.log("Pusher: Comparing IDs", { incomingContactId, currentId });
 
       if (
         incomingContactId &&
@@ -692,11 +696,11 @@ export default function ChatPage({
             return [...prev, newMsg];
           });
         }
-        // Also re-fetch from DB to ensure we have complete data
+        // Re-fetch from DB after short delay to ensure complete data
         setTimeout(() => {
           const cid = selectedContactIdRef.current;
           if (cid) {
-            fetch(`/api/chat/messages/${cid}`)
+            fetch(`/api/chat/messages/${cid}?poll=1`)
               .then((r) => r.json())
               .then((d) => {
                 if (d.messages?.length) setMessages(d.messages);
@@ -711,7 +715,6 @@ export default function ChatPage({
 
     channel.bind(PUSHER_EVENTS.NEW_MESSAGE, onNewMessage);
     channel.bind(PUSHER_EVENTS.MESSAGE_STATUS, (data: any) => {
-      console.log("Pusher: MESSAGE_STATUS received", data);
       if (data.waMessageId && data.status) {
         setMessages((prev) =>
           prev.map((m) =>
@@ -723,7 +726,6 @@ export default function ChatPage({
       }
     });
     channel.bind(PUSHER_EVENTS.CONTACT_UPDATE, () => {
-      console.log("Pusher: CONTACT_UPDATE received");
       refreshContactsRef.current();
     });
 
@@ -750,6 +752,33 @@ export default function ChatPage({
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, []);
+
+  // Polling fallback — lightweight poll every 5 s (catches new messages if Pusher
+  // is unavailable). Uses ?poll=1 so the server skips the WhatsApp read-receipt API call.
+  useEffect(() => {
+    if (!selectedContactId) return;
+    const id = setInterval(() => {
+      fetch(`/api/chat/messages/${selectedContactId}?poll=1`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (!d.messages?.length) return;
+          setMessages((prev) => {
+            // Skip state update if nothing changed (avoid useless re-renders)
+            if (
+              d.messages.length === prev.length &&
+              d.messages[d.messages.length - 1]?.id === prev[prev.length - 1]?.id
+            )
+              return prev;
+            return d.messages;
+          });
+          if (d.contact) setActiveContact((prev: any) =>
+            prev?.unreadMessagesCount === d.contact.unreadMessagesCount ? prev : d.contact
+          );
+        })
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(id);
+  }, [selectedContactId]);
 
   /* ── File Selection ── */
   const VIDEO_MAX_MB = 16;
@@ -813,7 +842,6 @@ export default function ChatPage({
         }
       }
 
-      console.log("ChatPage: startRecording, using mimeType:", selectedMimeType);
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mr = new MediaRecorder(stream, { mimeType: selectedMimeType });
@@ -842,7 +870,6 @@ export default function ChatPage({
         }
 
         const file = new File([blob], `voice.${ext}`, { type: finalMimeType });
-        console.log("ChatPage: final file to send:", { name: file.name, type: file.type });
 
         stream.getTracks().forEach((t) => t.stop());
         await sendMedia(file, "audio", true);
@@ -851,7 +878,7 @@ export default function ChatPage({
       setMediaRecorder(mr);
       setRecording(true);
     } catch (err) {
-      console.error("ChatPage: startRecording error:", err);
+      console.error("startRecording error:", err);
       alert(t("micDenied"));
     }
   }
@@ -1012,31 +1039,37 @@ export default function ChatPage({
   const todayLabel = t("today");
   const yesterdayLabel = t("yesterday");
 
-  /* ── Group messages by date ── */
-  const messagesWithDates = messages.reduce<
-    Array<{ type: "date" | "msg"; date?: string; msg?: any }>
-  >((acc, msg, i) => {
-    if (!msg.createdAt) {
+  /* ── Group messages by date (memoized) ── */
+  const messagesWithDates = useMemo(() => {
+    return messages.reduce<
+      Array<{ type: "date" | "msg"; date?: string; msg?: any }>
+    >((acc, msg, i) => {
+      if (!msg.createdAt) {
+        acc.push({ type: "msg", msg });
+        return acc;
+      }
+      const prev = messages[i - 1];
+      if (!prev || !prev.createdAt || !isSameDay(prev.createdAt, msg.createdAt)) {
+        acc.push({
+          type: "date",
+          date: formatDate(msg.createdAt, todayLabel, yesterdayLabel),
+        });
+      }
       acc.push({ type: "msg", msg });
       return acc;
-    }
-    const prev = messages[i - 1];
-    if (!prev || !prev.createdAt || !isSameDay(prev.createdAt, msg.createdAt)) {
-      acc.push({
-        type: "date",
-        date: formatDate(msg.createdAt, todayLabel, yesterdayLabel),
-      });
-    }
-    acc.push({ type: "msg", msg });
-    return acc;
-  }, []);
+    }, []);
+  }, [messages, todayLabel, yesterdayLabel]);
 
-  const filterLabels: { key: ChatFilter; label: string }[] = [
-    { key: "all", label: t("filterAll") },
-    { key: "unread", label: t("filterUnread") },
-    { key: "mine", label: t("filterMine") },
-    { key: "unassigned", label: t("filterUnassigned") },
-  ];
+  const filterLabels = useMemo<{ key: ChatFilter; label: string }[]>(
+    () => [
+      { key: "all", label: t("filterAll") },
+      { key: "unread", label: t("filterUnread") },
+      { key: "mine", label: t("filterMine") },
+      { key: "unassigned", label: t("filterUnassigned") },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [locale],
+  );
 
   return (
     <div className="flex h-full rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-white">

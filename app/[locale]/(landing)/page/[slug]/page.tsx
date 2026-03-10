@@ -1,16 +1,17 @@
 import { notFound } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import { Link } from '@/i18n/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 interface Props {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ locale: string; slug: string }>;
 }
 
 export default async function DynamicPage({ params }: Props) {
+  const { locale, slug } = await params;
+  setRequestLocale(locale);
   const tCommon = await getTranslations('common');
-  const { slug } = await params;
-  const page = await prisma.page.findUnique({
+  const page = await prisma.page.findFirst({
     where: { slug, status: 1 },
   });
 
