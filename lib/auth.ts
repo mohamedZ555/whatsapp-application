@@ -9,7 +9,7 @@ import prisma from "@/lib/prisma";
 import { USER_ROLES } from "@/lib/constants";
 import { getPlanDisabledPermsForVendor, toPermissionArray } from "@/lib/permissions";
 
-const ACCESS_SYNC_INTERVAL_MS = 60_000;
+const ACCESS_SYNC_INTERVAL_MS = 5 * 60_000; // 5 minutes
 
 type AccessClaims = {
   uid: string;

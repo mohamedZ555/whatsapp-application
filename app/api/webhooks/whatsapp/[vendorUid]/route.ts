@@ -70,23 +70,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ven
           messageContent = msg.button?.text ?? '';
         }
 
-        // Find or create contact
-        let contact = await prisma.contact.findUnique({
+        // Upsert contact (create if new, otherwise fetch existing)
+        const ownerId = await getVendorOwnerUserId(vendor.id);
+        const contact = await prisma.contact.upsert({
           where: { vendorId_waId: { vendorId: vendor.id, waId: from } },
+          create: {
+            vendorId: vendor.id,
+            waId: from,
+            phoneNumber: from,
+            status: 1,
+            assignedUserId: ownerId,
+            messagedAt: new Date(),
+            unreadMessagesCount: 1,
+          },
+          update: {
+            messagedAt: new Date(),
+            unreadMessagesCount: { increment: 1 },
+          },
         });
-
-        if (!contact) {
-          const ownerId = await getVendorOwnerUserId(vendor.id);
-          contact = await prisma.contact.create({
-            data: {
-              vendorId: vendor.id,
-              waId: from,
-              phoneNumber: from,
-              status: 1,
-              assignedUserId: ownerId,
-            },
-          });
-        }
 
         // Create message log
         const log = await prisma.whatsappMessageLog.create({
@@ -102,12 +103,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ven
             timestamp: msg.timestamp ? new Date(parseInt(msg.timestamp) * 1000) : null,
             data: logData as Prisma.InputJsonValue,
           },
-        });
-
-        // Update contact
-        await prisma.contact.update({
-          where: { id: contact.id },
-          data: { messagedAt: new Date(), unreadMessagesCount: { increment: 1 } },
         });
 
         // Broadcast via Pusher

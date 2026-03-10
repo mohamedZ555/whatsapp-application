@@ -37,13 +37,25 @@ export async function GET(req: NextRequest) {
     where,
     orderBy: [{ messagedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }],
     take: 50,
-    include: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      waId: true,
+      phoneNumber: true,
+      status: true,
+      messagedAt: true,
+      unreadMessagesCount: true,
+      assignedUserId: true,
+      vendorId: true,
       messageLogs: {
         orderBy: { createdAt: 'desc' },
         take: 1,
         select: { messageContent: true, messageType: true, createdAt: true, isIncomingMessage: true },
       },
-      labels: { include: { label: { select: { name: true, color: true } } } },
+      labels: {
+        select: { label: { select: { name: true, color: true } } },
+      },
     },
   });
   return NextResponse.json(contacts);

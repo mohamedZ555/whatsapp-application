@@ -29,7 +29,10 @@
       "Bash(wc:*)",
       "Bash(icacls:*)",
       "Bash(cmd.exe:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(cd /d/whatsapp-application && npx prisma migrate dev --name add_performance_indexes 2>&1)",
+      "Bash(cd /d/whatsapp-application && npx prisma migrate dev --name add_performance_indexes --create-only 2>&1)",
+      "Bash(cd /d/whatsapp-application && PRISMA_HIDE_UPDATE_MESSAGE=true npx prisma migrate dev --name add_performance_indexes 2>&1 || npx prisma db push 2>&1)"
     ]
   }
 }

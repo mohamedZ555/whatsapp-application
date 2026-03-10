@@ -192,8 +192,15 @@ export function toPermissionArray(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === 'string');
 }
 
+// In-memory cache for plan disabled perms: vendorId -> { value, expiresAt }
+const planDisabledPermsCache = new Map<string, { value: string[]; expiresAt: number }>();
+const PLAN_PERMS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 export async function getPlanDisabledPermsForVendor(vendorId: string): Promise<string[]> {
   if (!vendorId) return [];
+
+  const cached = planDisabledPermsCache.get(vendorId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
 
   const [subscription, plans] = await Promise.all([
     getVendorSubscription(vendorId),
@@ -202,9 +209,15 @@ export async function getPlanDisabledPermsForVendor(vendorId: string): Promise<s
 
   const planId = subscription?.planId ?? 'free';
   const plan = plans[planId] ?? plans['free'];
-  if (!plan) return [];
+  const value = plan ? computePlanDisabledPerms(plan.features) : [];
 
-  return computePlanDisabledPerms(plan.features);
+  planDisabledPermsCache.set(vendorId, { value, expiresAt: Date.now() + PLAN_PERMS_CACHE_TTL_MS });
+  return value;
+}
+
+/** Call this when a vendor's subscription changes to invalidate the cache. */
+export function invalidatePlanDisabledPermsCache(vendorId: string) {
+  planDisabledPermsCache.delete(vendorId);
 }
 
 export function hasPermission(permissions: string[], permission: string): boolean {

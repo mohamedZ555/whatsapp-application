@@ -223,6 +223,8 @@ model Contact {
   @@unique([vendorId, waId])
   @@index([vendorId, status])
   @@index([messagedAt(sort: Desc)])
+  @@index([vendorId, assignedUserId])
+  @@index([vendorId, unreadMessagesCount])
   @@map("contacts")
 }
 
@@ -356,6 +358,9 @@ model WhatsappMessageLog {
   @@index([campaignId])
   @@index([status, messagedAt(sort: Desc)])
   @@index([waMessageId])
+  @@index([vendorId, createdAt(sort: Desc)])
+  @@index([vendorId, status])
+  @@index([contactId, createdAt(sort: Desc)])
   @@map("whatsapp_message_logs")
 }
 

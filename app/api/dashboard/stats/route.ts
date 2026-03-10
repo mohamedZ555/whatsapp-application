@@ -48,8 +48,14 @@ export async function GET(req: NextRequest) {
     prisma.whatsappMessageLog.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      take: 50,
-      include: {
+      take: 20,
+      select: {
+        id: true,
+        messageType: true,
+        messageContent: true,
+        status: true,
+        isIncomingMessage: true,
+        createdAt: true,
         contact: { select: { firstName: true, lastName: true, waId: true } },
       },
     }),
